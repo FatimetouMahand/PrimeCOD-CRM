@@ -1,0 +1,204 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap");
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  font-family: "Hanken Grotesk", "Montserrat", "IBM Plex Sans Arabic", sans-serif;
+  background: #fbf9f8;
+  color: #1b1c1c;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   GLASS CARD (used across many pages)
+─────────────────────────────────────────────────────────────── */
+.glass-card {
+  background: white;
+  border-radius: 18px;
+  border: 1px solid #edf0f5;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   TABLES — always horizontally scrollable on small screens
+─────────────────────────────────────────────────────────────── */
+table {
+  font-size: 13px;
+  width: 100%;
+}
+
+.table-wrap,
+.glass-card > div {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   SIDEBAR BACKDROP (only visible on mobile when sidebar open)
+─────────────────────────────────────────────────────────────── */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.15); opacity: 0.7; }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   PULL ANIMATIONS
+─────────────────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  border: 2.5px solid #e5e7eb;
+  border-top-color: #0d3938;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   RESPONSIVE BREAKPOINTS
+   - Mobile:  < 640px
+   - Tablet:  640px – 1024px
+   - Desktop: ≥ 1024px
+─────────────────────────────────────────────────────────────── */
+
+/* ── TABLET & MOBILE (< 1024px) ── */
+@media (max-width: 1023px) {
+  .sidebar-backdrop {
+    display: block;
+  }
+}
+
+/* ── TABLET (640px – 1023px) ── */
+@media (max-width: 1023px) and (min-width: 640px) {
+  .page-content-mobile {
+    padding: 18px 16px !important;
+  }
+}
+
+/* ── MOBILE ONLY (< 640px) ── */
+@media (max-width: 639px) {
+  .glass-card {
+    border-radius: 14px;
+  }
+
+  /* Smaller padding for page content on mobile */
+  .page-content-mobile {
+    padding: 14px 12px !important;
+  }
+
+  /* Hide non-essential elements on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Stack grids vertically on mobile */
+  .stack-mobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Smaller stat cards on mobile */
+  .stat-card-mobile {
+    padding: 10px 12px !important;
+  }
+
+  /* Reduce font sizes a touch on mobile */
+  h1 {
+    font-size: 18px !important;
+  }
+
+  table {
+    font-size: 12px;
+  }
+
+  table th,
+  table td {
+    padding: 8px 10px !important;
+    white-space: nowrap;
+  }
+
+  /* Modals: full width on mobile with safe margins */
+  .modal-mobile {
+    width: calc(100vw - 24px) !important;
+    max-width: 420px !important;
+  }
+
+  /* Filter bars: stack & allow wrap */
+  .filter-bar-mobile {
+    flex-wrap: wrap !important;
+  }
+
+  /* Hide search input by default on mobile, show icon-only */
+  .search-mobile-compact {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ── EXTRA SMALL (< 400px) ── */
+@media (max-width: 399px) {
+  .page-content-mobile {
+    padding: 12px 10px !important;
+  }
+
+  h1 {
+    font-size: 17px !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   TOUCH-FRIENDLY: bigger tap targets on touch devices
+─────────────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 36px;
+  }
+
+  /* Prevent zoom on input focus (iOS) */
+  input[type="text"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="email"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   PRINT STYLES (optional, for exports)
+─────────────────────────────────────────────────────────────── */
+@media print {
+  .sidebar-backdrop,
+  nav,
+  aside {
+    display: none !important;
+  }
+}

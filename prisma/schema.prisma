@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String    @id @default(cuid())
+  name       String
+  phone      String    @unique
+  password   String
+  role       String
+  suspended  Boolean   @default(false)
+  isOnline   Boolean   @default(false)
+  lastSeenAt DateTime?
+  startDate  DateTime?
+  createdAt  DateTime  @default(now())
+
+  orders             Order[]
+  productAssignments ProductAgent[]
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  code             String   @unique
+  price            Float    @default(0)
+  distributionType String   @default("random")
+  createdAt        DateTime @default(now())
+
+  orders Order[]
+  agents ProductAgent[]
+}
+
+model ProductAgent {
+  productId String
+  agentId   String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  agent     User    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@id([productId, agentId])
+}
+
+model Status {
+  id              String   @id @default(cuid())
+  name            String
+  color           String
+  isActive        Boolean  @default(true)
+  isFinal         Boolean  @default(false)  // true = commande terminée (ex: Confirmée, Rejetée) → pas redistribuée
+  alertAfterHours Int?
+  createdAt       DateTime @default(now())
+
+  orders Order[]
+}
+
+model ShopifyStore {
+  id            String   @id @default(cuid())
+  name          String
+  domain        String   @unique
+  accessToken   String
+  webhookSecret String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+model Settings {
+  key   String @id
+  value String
+}
+
+model Order {
+  id        String   @id @default(cuid())
+  customer  String
+  phone     String
+  city      String
+  price     Float
+  quantity  Int
+  revenue   Float
+  notes     String?
+  attempts  Int      @default(0)
+  statusId  String
+  productId String
+  agentId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  status  Status  @relation(fields: [statusId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  agent   User?   @relation(fields: [agentId], references: [id])
+}
