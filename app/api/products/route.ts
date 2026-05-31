@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { verifyToken } from "@/lib/auth/jwt";
+import { cookies } from "next/headers";
+
+async function getCallerRole(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("crm_token")?.value;
+    if (!token) return null;
+    const p = verifyToken(token) as { role: string };
+    return p.role;
+  } catch { return null; }
+}
 
 function generateCode(name: string): string {
   const prefix = name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, "X").padEnd(3, "X");
@@ -60,10 +72,24 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const role = await getCallerRole();
+  if (role !== "Admin") {
+    return NextResponse.json({ error: "Forbidden — Admin only" }, { status: 403 });
+  }
   try {
     const { ids } = await request.json();
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "No IDs" }, { status: 400 });
+    }
+    // Check if any product has linked orders
+    const withOrders = await prisma.product.findMany({
+      where: { id: { in: ids }, orders: { some: {} } },
+      select: { name: true },
+    });
+    if (withOrders.length > 0) {
+      return NextResponse.json({
+        error: `Cannot delete: ${withOrders.map(p => p.name).join(", ")} still have orders linked`,
+      }, { status: 409 });
     }
     const { count } = await prisma.product.deleteMany({ where: { id: { in: ids } } });
     return NextResponse.json({ success: true, deleted: count });

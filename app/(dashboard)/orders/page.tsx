@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Search, Trash2, UserCheck, Bell, BarChart2,
-  SlidersHorizontal, ChevronDown, X,
+  SlidersHorizontal, ChevronDown, X, Calendar,
   ShoppingCart, CheckCircle2, Clock3, DollarSign,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
@@ -54,6 +54,10 @@ export default function OrdersPage() {
   const [search,        setSearch]        = useState("");
   const [filterStatus,  setFilterStatus]  = useState("");
   const [filterProduct, setFilterProduct] = useState("");
+  const [filterDate,    setFilterDate]    = useState(() => {
+    // Default: today
+    return new Date().toISOString().slice(0, 10);
+  });
 
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [showStats,    setShowStats]    = useState(true);
@@ -73,14 +77,15 @@ export default function OrdersPage() {
 
   // ── Fetch orders ──────────────────────────────────────────────────────
   const load = useCallback(async (opts: {
-    cursor?: string; search?: string; statusId?: string; productId?: string; append?: boolean;
+    cursor?: string; search?: string; statusId?: string; productId?: string; date?: string; append?: boolean;
   } = {}) => {
-    const { cursor, search: q = "", statusId = "", productId = "", append = false } = opts;
+    const { cursor, search: q = "", statusId = "", productId = "", date = "", append = false } = opts;
     const p = new URLSearchParams();
     if (cursor)    p.set("cursor",    cursor);
     if (q)         p.set("search",    q);
     if (statusId)  p.set("statusId",  statusId);
     if (productId) p.set("productId", productId);
+    if (date)      { p.set("dateFrom", date); p.set("dateTo", date); }
 
     append ? setLoadingMore(true) : setLoading(true);
     try {
@@ -97,7 +102,7 @@ export default function OrdersPage() {
 
   // ── Initial load ──────────────────────────────────────────────────────
   useEffect(() => {
-    load();
+    load({ date: filterDate });
     Promise.all([
       fetch("/api/statuses").then(r => r.json()),
       fetch("/api/products").then(r => r.json()),
@@ -114,19 +119,19 @@ export default function OrdersPage() {
     if (!sentinel.current) return;
     const obs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && hasMore && !loadingMore) {
-        load({ cursor: nextCursor ?? undefined, search, statusId: filterStatus, productId: filterProduct, append: true });
+        load({ cursor: nextCursor ?? undefined, search, statusId: filterStatus, productId: filterProduct, date: filterDate, append: true });
       }
     }, { threshold: 0.1 });
     obs.observe(sentinel.current);
     return () => obs.disconnect();
-  }, [hasMore, loadingMore, nextCursor, search, filterStatus, filterProduct, load]);
+  }, [hasMore, loadingMore, nextCursor, search, filterStatus, filterProduct, filterDate, load]);
 
   // ── Search (debounced 400ms) ──────────────────────────────────────────
   const handleSearch = (val: string) => {
     setSearch(val);
     if (searchTmr.current) clearTimeout(searchTmr.current);
     searchTmr.current = setTimeout(() => {
-      load({ search: val, statusId: filterStatus, productId: filterProduct });
+      load({ search: val, statusId: filterStatus, productId: filterProduct, date: filterDate });
     }, 400);
   };
 
@@ -135,13 +140,24 @@ export default function OrdersPage() {
     const s = key === "status"  ? val : filterStatus;
     const p = key === "product" ? val : filterProduct;
     key === "status" ? setFilterStatus(val) : setFilterProduct(val);
-    load({ search, statusId: s, productId: p });
+    load({ search, statusId: s, productId: p, date: filterDate });
+  };
+
+  // ── Date filter ───────────────────────────────────────────────────────
+  const handleDate = (val: string) => {
+    setFilterDate(val);
+    load({ search, statusId: filterStatus, productId: filterProduct, date: val });
+  };
+
+  const clearDate = () => {
+    setFilterDate("");
+    load({ search, statusId: filterStatus, productId: filterProduct, date: "" });
   };
 
   // ── Refresh ───────────────────────────────────────────────────────────
   const refresh = () => {
     setSelected(new Set());
-    load({ search, statusId: filterStatus, productId: filterProduct });
+    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate });
   };
 
   // ── Selection ─────────────────────────────────────────────────────────
@@ -264,11 +280,12 @@ export default function OrdersPage() {
     <div>
 
       {/* ── HEADER ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
         <div>
           <h1 style={{ fontSize: "22px", fontWeight: 800, marginBottom: "3px" }}>Orders</h1>
           <p style={{ color: "#6b7280", fontSize: "11px" }}>
-            {stats ? `${stats.total.toLocaleString()} total orders` : "All customer orders"}
+            {stats ? `${stats.total.toLocaleString()} commandes` : "Toutes les commandes"}
+            {filterDate && ` — ${new Date(filterDate).toLocaleDateString("fr", { day: "2-digit", month: "long", year: "numeric" })}`}
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
@@ -371,6 +388,68 @@ export default function OrdersPage() {
         </div>
       )}
 
+      {/* ── DATE FILTER BAR ── */}
+      <div className="glass-card" style={{ marginBottom: "8px" }}>
+        <div style={{ padding: "10px 14px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+          <Calendar size={14} color="#6b7280" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#374151", whiteSpace: "nowrap" }}>Date :</span>
+
+          {/* Quick buttons */}
+          {[
+            { label: "Aujourd'hui", days: 0 },
+            { label: "Hier",        days: -1 },
+            { label: "7 jours",     days: -6 },
+          ].map(({ label, days }) => {
+            const d = new Date();
+            d.setDate(d.getDate() + days);
+            const val = d.toISOString().slice(0, 10);
+            const active = filterDate === val && days !== -6;
+            return (
+              <button
+                key={label}
+                onClick={() => handleDate(val)}
+                style={{
+                  height: 30, padding: "0 12px", borderRadius: 8, border: "1.5px solid",
+                  borderColor: active ? "#0d3938" : "#e5e7eb",
+                  background: active ? "#beecdf" : "white",
+                  color: active ? "#0d3938" : "#374151",
+                  fontSize: 11, fontWeight: active ? 700 : 500, cursor: "pointer",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+
+          {/* Custom date input */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={e => handleDate(e.target.value)}
+              style={{
+                height: 30, border: "1.5px solid #e5e7eb", borderRadius: 8,
+                padding: "0 8px", fontSize: 11, outline: "none",
+                background: "white", cursor: "pointer", color: "#374151",
+              }}
+            />
+            {filterDate && (
+              <button
+                onClick={clearDate}
+                title="Voir toutes les dates"
+                style={{
+                  height: 30, padding: "0 10px", borderRadius: 8,
+                  border: "1.5px solid #e5e7eb", background: "white",
+                  fontSize: 10, fontWeight: 600, color: "#6b7280", cursor: "pointer",
+                }}
+              >
+                Toutes les dates
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* ── FILTERS BAR ── */}
       <div className="glass-card" style={{ marginBottom: "10px" }}>
         <div style={{ padding: "10px 14px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -381,7 +460,7 @@ export default function OrdersPage() {
             <input
               value={search}
               onChange={e => handleSearch(e.target.value)}
-              placeholder="Search customer, phone…"
+              placeholder="Rechercher client, téléphone…"
               style={{
                 width: "100%", paddingLeft: 30, paddingRight: 12, height: 34,
                 border: "1px solid #e5e7eb", borderRadius: 9, fontSize: 11,
@@ -396,7 +475,7 @@ export default function OrdersPage() {
             onChange={e => handleFilter("status", e.target.value)}
             style={{ height: 34, border: "1px solid #e5e7eb", borderRadius: 9, fontSize: 11, padding: "0 10px", outline: "none", background: "white", cursor: "pointer" }}
           >
-            <option value="">All Statuses</option>
+            <option value="">Tous les statuts</option>
             {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
 
@@ -406,7 +485,7 @@ export default function OrdersPage() {
             onChange={e => handleFilter("product", e.target.value)}
             style={{ height: 34, border: "1px solid #e5e7eb", borderRadius: 9, fontSize: 11, padding: "0 10px", outline: "none", background: "white", cursor: "pointer" }}
           >
-            <option value="">All Products</option>
+            <option value="">Tous les produits</option>
             {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
 

@@ -24,8 +24,26 @@ export async function GET(request: Request) {
   const search    = searchParams.get("search")    || "";
   const statusId  = searchParams.get("statusId")  || "";
   const productId = searchParams.get("productId") || "";
+  const dateFrom  = searchParams.get("dateFrom")  || ""; // YYYY-MM-DD
+  const dateTo    = searchParams.get("dateTo")    || ""; // YYYY-MM-DD
 
   const caller = await getCaller();
+
+  // Build date range filter
+  let createdAtFilter: Record<string, Date> | undefined;
+  if (dateFrom || dateTo) {
+    createdAtFilter = {};
+    if (dateFrom) {
+      const d = new Date(dateFrom);
+      d.setHours(0, 0, 0, 0);
+      createdAtFilter.gte = d;
+    }
+    if (dateTo) {
+      const d = new Date(dateTo);
+      d.setHours(23, 59, 59, 999);
+      createdAtFilter.lte = d;
+    }
+  }
 
   const where: Record<string, unknown> = {
     ...(search ? {
@@ -34,8 +52,9 @@ export async function GET(request: Request) {
         { phone:    { contains: search } },
       ],
     } : {}),
-    ...(statusId  ? { statusId }  : {}),
-    ...(productId ? { productId } : {}),
+    ...(statusId         ? { statusId }                        : {}),
+    ...(productId        ? { productId }                       : {}),
+    ...(createdAtFilter  ? { createdAt: createdAtFilter }      : {}),
   };
 
   // Role-based filtering

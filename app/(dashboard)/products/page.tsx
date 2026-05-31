@@ -48,12 +48,20 @@ export default function ProductsPage() {
     setSelected(prev => prev.size === list.length ? new Set() : new Set(list.map(p => p.id)));
 
   // ── Bulk delete ───────────────────────────────────────────────────────
+  const [deleteError, setDeleteError] = useState("");
+
   const handleDelete = async () => {
-    await fetch("/api/products", {
+    setDeleteError("");
+    const res = await fetch("/api/products", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: [...selected] }),
     });
+    const data = await res.json();
+    if (!res.ok) {
+      setDeleteError(data.error || "Delete failed");
+      return;
+    }
     setProducts(prev => prev.filter(p => !selected.has(p.id)));
     setSelected(new Set());
     setConfirmDel(false);
@@ -215,10 +223,15 @@ export default function ProductsPage() {
             </div>
             <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Delete Products?</h3>
             <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 20 }}>
-              Delete <strong>{selected.size}</strong> product{selected.size > 1 ? "s" : ""}? Orders linked to them will lose their product reference.
+              Delete <strong>{selected.size}</strong> product{selected.size > 1 ? "s" : ""}? This cannot be undone.
             </p>
+            {deleteError && (
+              <p style={{ fontSize: 11, color: "#ef4444", marginBottom: 12, background: "#fee2e2", padding: "8px 12px", borderRadius: 8 }}>
+                ⚠ {deleteError}
+              </p>
+            )}
             <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-              <button onClick={() => setConfirmDel(false)} style={{ border: "1px solid #e5e7eb", background: "white", padding: "9px 20px", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => { setConfirmDel(false); setDeleteError(""); }} style={{ border: "1px solid #e5e7eb", background: "white", padding: "9px 20px", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
               <button onClick={handleDelete} style={{ border: "none", background: "#ef4444", color: "white", padding: "9px 20px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Delete</button>
             </div>
           </div>

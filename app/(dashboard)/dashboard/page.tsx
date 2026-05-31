@@ -1067,24 +1067,8 @@ undefined && (
                               "10px",
                             fontWeight:
                               "700",
-
-                            background:
-                              order.status ===
-                              "Confirmed"
-                                ? "#dcfce7"
-                                : order.status ===
-                                  "Pending"
-                                ? "#fef3c7"
-                                : "#fee2e2",
-
-                            color:
-                              order.status ===
-                              "Confirmed"
-                                ? "#166534"
-                                : order.status ===
-                                  "Pending"
-                                ? "#92400e"
-                                : "#991b1b",
+                            background: "#f3f4f6",
+                            color: "#374151",
                           }}
                         >
                           {

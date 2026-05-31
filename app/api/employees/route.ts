@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/hash";
+import { verifyToken } from "@/lib/auth/jwt";
+import { cookies } from "next/headers";
+
+async function getCallerRole(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("crm_token")?.value;
+    if (!token) return null;
+    const p = verifyToken(token) as { role: string };
+    return p.role;
+  } catch { return null; }
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -47,6 +59,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const role = await getCallerRole();
+  if (role !== "Admin") {
+    return NextResponse.json({ error: "Forbidden — Admin only" }, { status: 403 });
+  }
   try {
     const { ids } = await request.json();
     if (!Array.isArray(ids) || ids.length === 0) {

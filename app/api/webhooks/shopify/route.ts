@@ -116,12 +116,17 @@ export async function POST(request: Request) {
       });
     }
 
-    // ── Find pending status ───────────────────────────────────────────────
+    // ── Find initial status (non-final = pending/en attente) ─────────────
+    // Priority: isFinal:false → oldest created (language-agnostic)
     let status = await prisma.status.findFirst({
-      where: { name: { contains: "pend", mode: "insensitive" } },
+      where: { isFinal: false, isActive: true },
+      orderBy: { createdAt: "asc" },
     });
     if (!status) {
-      status = await prisma.status.findFirst({ orderBy: { createdAt: "asc" } });
+      status = await prisma.status.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
     }
     if (!status) {
       return NextResponse.json({ error: "No status configured" }, { status: 500 });
