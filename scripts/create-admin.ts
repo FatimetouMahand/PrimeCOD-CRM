@@ -98,6 +98,23 @@ async function main() {
     create: { name: agentName, phone: agentPhone, password: agentHash, role: "Agent" },
   });
 
+  // Créer les statuts par défaut (seulement si aucun n'existe)
+  const existingStatuses = await prisma.status.count();
+  if (existingStatuses === 0) {
+    await prisma.status.createMany({
+      data: [
+        { name: "En attente",    color: "#f59e0b", isFinal: false, isActive: true },
+        { name: "Confirmée",     color: "#22c55e", isFinal: true,  isActive: true },
+        { name: "Rejetée",       color: "#ef4444", isFinal: true,  isActive: true },
+        { name: "Ne répond pas", color: "#6b7280", isFinal: false, isActive: true, alertAfterHours: 24 },
+        { name: "Annulée",       color: "#dc2626", isFinal: true,  isActive: true },
+      ],
+    });
+    console.log("\n   + 5 statuts par defaut crees (En attente, Confirmee, Rejetee...)");
+  } else {
+    console.log(`\n   Statuts: ${existingStatuses} deja existants — non modifies`);
+  }
+
   const line = "=".repeat(56);
   console.log("\n" + line);
   console.log("Comptes prets !");

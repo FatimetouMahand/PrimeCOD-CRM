@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     }
 
     // ── Find initial status (non-final = pending/en attente) ─────────────
-    // Priority: isFinal:false → oldest created (language-agnostic)
+    // Priority 1: isFinal:false active → Priority 2: any active → Priority 3: auto-create
     let status = await prisma.status.findFirst({
       where: { isFinal: false, isActive: true },
       orderBy: { createdAt: "asc" },
@@ -128,8 +128,24 @@ export async function POST(request: Request) {
         orderBy: { createdAt: "asc" },
       });
     }
+    // Auto-create default statuses if DB is empty (fresh deployment)
     if (!status) {
-      return NextResponse.json({ error: "No status configured" }, { status: 500 });
+      await prisma.status.createMany({
+        data: [
+          { name: "En attente",  color: "#f59e0b", isFinal: false, isActive: true },
+          { name: "Confirmée",   color: "#22c55e", isFinal: true,  isActive: true },
+          { name: "Rejetée",     color: "#ef4444", isFinal: true,  isActive: true },
+          { name: "Ne répond pas", color: "#6b7280", isFinal: false, isActive: true, alertAfterHours: 24 },
+        ],
+        skipDuplicates: true,
+      });
+      status = await prisma.status.findFirst({
+        where: { isFinal: false, isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
+    }
+    if (!status) {
+      return NextResponse.json({ error: "Status creation failed" }, { status: 500 });
     }
 
     // ── Create order ──────────────────────────────────────────────────────
