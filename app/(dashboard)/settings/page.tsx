@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, Trash2, RefreshCw, Store, Settings2,
-  Database, Check, Eye, EyeOff, Copy,
+  Database, Check, Eye, EyeOff, Copy, Download, Package,
 } from "lucide-react";
 
 interface ShopifyStore {
@@ -146,6 +146,8 @@ function GeneralTab() {
 function ShopifyTab() {
   const [stores,      setStores]      = useState<ShopifyStore[]>([]);
   const [showForm,    setShowForm]    = useState(false);
+  const [syncing,     setSyncing]     = useState<"orders"|"products"|null>(null);
+  const [syncResult,  setSyncResult]  = useState<string>("");
   const [name,        setName]        = useState("");
   const [domain,      setDomain]      = useState("");
   const [token,       setToken]       = useState("");
@@ -211,6 +213,27 @@ function ShopifyTab() {
     setTimeout(() => setCopiedUrl(false), 1500);
   };
 
+  const syncNow = async (type: "orders" | "products") => {
+    setSyncing(type);
+    setSyncResult("");
+    try {
+      const res  = await fetch(`/api/shopify/sync?type=${type}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncResult(`❌ ${data.error}`);
+      } else if (type === "orders") {
+        setSyncResult(`✅ ${data.created} nouvelles commandes importées (${data.skipped} ignorées)`);
+      } else {
+        setSyncResult(`✅ ${data.created} nouveaux produits importés`);
+      }
+    } catch {
+      setSyncResult("❌ Erreur réseau");
+    } finally {
+      setSyncing(null);
+      setTimeout(() => setSyncResult(""), 6000);
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Flow banner */}
@@ -223,6 +246,55 @@ function ShopifyTab() {
         Client → Shopify Store → EasySell (COD Form) → Shopify Orders
         → <strong>Notre Webhook</strong> → Dashboard CRM
       </div>
+
+      {/* Manual Sync — same as old app */}
+      <Card
+        title="Synchronisation manuelle"
+        subtitle="Importer les commandes et produits existants depuis Shopify (nécessite SHOPIFY_ACCESS_TOKEN dans les variables d'environnement)"
+      >
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            onClick={() => syncNow("orders")}
+            disabled={syncing !== null}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "9px 18px", borderRadius: 9, border: "none",
+              background: syncing === "orders" ? "#9ca3af" : "#0d3938",
+              color: "white", fontWeight: 700, fontSize: 12,
+              cursor: syncing !== null ? "not-allowed" : "pointer",
+            }}
+          >
+            <Download size={13} style={{ animation: syncing === "orders" ? "spin 1s linear infinite" : "none" }} />
+            {syncing === "orders" ? "Import en cours…" : "Importer les commandes"}
+          </button>
+
+          <button
+            onClick={() => syncNow("products")}
+            disabled={syncing !== null}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "9px 18px", borderRadius: 9,
+              border: "1.5px solid #e5e7eb", background: "white",
+              color: "#374151", fontWeight: 700, fontSize: 12,
+              cursor: syncing !== null ? "not-allowed" : "pointer",
+            }}
+          >
+            <Package size={13} style={{ animation: syncing === "products" ? "spin 1s linear infinite" : "none" }} />
+            {syncing === "products" ? "Import en cours…" : "Importer les produits"}
+          </button>
+        </div>
+
+        {syncResult && (
+          <div style={{
+            marginTop: 10, padding: "9px 14px", borderRadius: 9,
+            background: syncResult.startsWith("✅") ? "#f0fdf4" : "#fef2f2",
+            color:      syncResult.startsWith("✅") ? "#166534" : "#dc2626",
+            fontSize: 12, fontWeight: 600,
+          }}>
+            {syncResult}
+          </div>
+        )}
+      </Card>
 
       {/* Webhook URL */}
       <Card title="URL du Webhook">
