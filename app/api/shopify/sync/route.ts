@@ -48,12 +48,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
 
-  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
-  const storeUrl    = process.env.SHOPIFY_STORE_URL;
+  // Prefer the store connected via Shopify OAuth (Settings → Shopify),
+  // fall back to env vars (old-app method) for backward compatibility.
+  const connectedStore = await prisma.shopifyStore.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const accessToken = connectedStore?.accessToken ?? process.env.SHOPIFY_ACCESS_TOKEN;
+  const storeUrl    = connectedStore?.domain      ?? process.env.SHOPIFY_STORE_URL;
 
   if (!accessToken || !storeUrl) {
     return NextResponse.json({
-      error: "SHOPIFY_ACCESS_TOKEN and SHOPIFY_STORE_URL must be set in environment variables.",
+      error: "Aucune boutique Shopify connectée. Va dans Réglages → Shopify pour te connecter.",
     }, { status: 500 });
   }
 

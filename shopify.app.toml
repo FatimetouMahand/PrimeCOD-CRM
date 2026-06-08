@@ -1,0 +1,22 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "59b418db4dfb7819bbca93d4fad72a3a"
+name = "PrimeCOD CRM"
+application_url = "https://prime-cod-crm.vercel.app"
+embedded = true
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_orders,write_orders,read_products,write_products,read_customers"
+
+[auth]
+redirect_urls = [
+  "https://prime-cod-crm.vercel.app/api/shopify/auth/callback",
+  "http://localhost:3000/api/shopify/auth/callback"
+]
+
+[build]
+automatically_update_urls_on_dev = true

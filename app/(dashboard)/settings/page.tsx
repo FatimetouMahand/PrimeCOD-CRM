@@ -156,6 +156,8 @@ function ShopifyTab() {
   const [showToken,   setShowToken]   = useState<Record<string, boolean>>({});
   const [adding,      setAdding]      = useState(false);
   const [copiedUrl,   setCopiedUrl]   = useState(false);
+  const [shopDomain,  setShopDomain]  = useState("");
+  const [connectMsg,  setConnectMsg]  = useState("");
 
   const webhookUrl = typeof window !== "undefined"
     ? `${window.location.origin}/api/webhooks/shopify`
@@ -169,6 +171,25 @@ function ShopifyTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("shopify_connected");
+    if (connected) {
+      setConnectMsg(`✅ Boutique connectée : ${connected}`);
+      window.history.replaceState({}, "", "/settings?tab=shopify");
+      setTimeout(() => setConnectMsg(""), 8000);
+    }
+  }, []);
+
+  const connectViaOAuth = () => {
+    const domain = shopDomain.trim().toLowerCase().replace(/^https?:\/\//, "");
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(domain)) {
+      setConnectMsg("❌ Format attendu : mon-store.myshopify.com");
+      return;
+    }
+    window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(domain)}`;
+  };
 
   const addStore = async () => {
     setFormError("");
@@ -319,6 +340,40 @@ function ShopifyTab() {
             {copiedUrl ? <Check size={13} /> : <Copy size={13} />}
           </button>
         </div>
+      </Card>
+
+      {/* OAuth connect — recommended, 1-click */}
+      <Card
+        title="Connecter une boutique Shopify"
+        subtitle="Méthode recommandée : autorise l'app PrimeCOD CRM en un clic, le token est récupéré automatiquement"
+      >
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input
+            value={shopDomain}
+            onChange={e => setShopDomain(e.target.value)}
+            placeholder="mon-store.myshopify.com"
+            style={{ ...IS, flex: 1, minWidth: 220 }}
+          />
+          <button onClick={connectViaOAuth} style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "9px 18px", borderRadius: 9, border: "none",
+            background: "#0d3938", color: "white", fontWeight: 700,
+            fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+            <Store size={13} />
+            Connecter via Shopify
+          </button>
+        </div>
+        {connectMsg && (
+          <div style={{
+            marginTop: 10, padding: "9px 14px", borderRadius: 9,
+            background: connectMsg.startsWith("✅") ? "#f0fdf4" : "#fef2f2",
+            color:      connectMsg.startsWith("✅") ? "#166534" : "#dc2626",
+            fontSize: 12, fontWeight: 600,
+          }}>
+            {connectMsg}
+          </div>
+        )}
       </Card>
 
       {/* Stores */}
