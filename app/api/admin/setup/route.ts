@@ -105,14 +105,25 @@ export async function GET(request: Request) {
     await prisma.$executeRawUnsafe(`ALTER TABLE "User" ALTER COLUMN "status" SET NOT NULL;`);
     log.push("✅ User.status ajouté et migré depuis suspended");
 
-    // ── STEP 4: Normalize role values (TEXT → uppercase for enum) ────────────
-    await prisma.$executeRawUnsafe(`UPDATE "User" SET "role" = 'ADMIN'      WHERE "role" IN ('Admin','admin');`);
-    await prisma.$executeRawUnsafe(`UPDATE "User" SET "role" = 'SUPERVISOR' WHERE "role" IN ('Supervisor','supervisor');`);
-    await prisma.$executeRawUnsafe(`UPDATE "User" SET "role" = 'AGENT'      WHERE "role" IN ('Agent','agent');`);
-    await prisma.$executeRawUnsafe(`UPDATE "User" SET "role" = 'AGENT_TEST' WHERE "role" IN ('Agent_Test','agent_test','AgentTest','AGENT_TEST');`);
-    log.push("✅ Valeurs de rôles normalisées");
+    // ── STEP 4: Normalize role values safely (works whether TEXT or enum) ────
+    // Cast to TEXT for comparison so it works even when column is already enum
+    await prisma.$executeRawUnsafe(`
+      DO $$ BEGIN
+        -- Only normalize if column is still TEXT type
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'User' AND column_name = 'role' AND data_type = 'text'
+        ) THEN
+          UPDATE "User" SET "role" = 'ADMIN'      WHERE "role" IN ('Admin','admin');
+          UPDATE "User" SET "role" = 'SUPERVISOR' WHERE "role" IN ('Supervisor','supervisor');
+          UPDATE "User" SET "role" = 'AGENT'      WHERE "role" IN ('Agent','agent');
+          UPDATE "User" SET "role" = 'AGENT_TEST' WHERE "role" IN ('Agent_Test','agent_test','AgentTest');
+        END IF;
+      END $$;
+    `);
+    log.push("✅ Valeurs de rôles normalisées (si nécessaire)");
 
-    // Convert role TEXT → Role enum
+    // Convert role TEXT → Role enum (safe: only if still TEXT)
     await prisma.$executeRawUnsafe(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -125,13 +136,15 @@ export async function GET(request: Request) {
     `);
     log.push("✅ User.role converti en enum Role");
 
-    // Convert status TEXT → UserStatus enum
+    // Convert status TEXT → UserStatus enum (safe: only if still TEXT)
     await prisma.$executeRawUnsafe(`
       DO $$ BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM information_schema.columns
           WHERE table_name = 'User' AND column_name = 'status' AND udt_name = 'UserStatus'
         ) THEN
+          -- Normalize values first
+          UPDATE "User" SET "status" = 'ACTIVE'   WHERE "status" NOT IN ('ACTIVE','INACTIVE');
           ALTER TABLE "User" ALTER COLUMN "status" TYPE "UserStatus" USING "status"::"UserStatus";
         END IF;
       END $$;
