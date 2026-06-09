@@ -24,9 +24,10 @@ export function SessionBar() {
   if (!user) return null;
 
   const roleColors: Record<string, { bg: string; color: string }> = {
-    Admin:      { bg: "#beecdf", color: "#0d3938" },
-    Supervisor: { bg: "#dbeafe", color: "#1d4ed8" },
-    Agent:      { bg: "#dcfce7", color: "#16a34a" },
+    ADMIN:      { bg: "#beecdf", color: "#0d3938" },
+    SUPERVISOR: { bg: "#dbeafe", color: "#1d4ed8" },
+    AGENT:      { bg: "#dcfce7", color: "#16a34a" },
+    AGENT_TEST: { bg: "#fef3c7", color: "#d97706" },
   };
   const rc = roleColors[user.role] ?? { bg: "#f3f4f6", color: "#374151" };
 
