@@ -108,7 +108,8 @@ export async function GET(request: Request) {
     const agentCounts: Record<string, number> = {};
     orders.forEach((o) => {
       if (o.agent) {
-        agentCounts[o.agent.name] = (agentCounts[o.agent.name] || 0) + 1;
+        const agentName = o.agent.name ?? "Agent";
+        agentCounts[agentName] = (agentCounts[agentName] || 0) + 1;
       }
     });
     const topAgents = Object.entries(agentCounts)

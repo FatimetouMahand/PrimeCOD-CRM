@@ -86,16 +86,16 @@ async function main() {
   const adminHash = await bcrypt.hash(adminPassword, 10);
   const admin = await prisma.user.upsert({
     where:  { phone: adminPhone },
-    update: { name: adminName, password: adminHash, role: "Admin", suspended: false },
-    create: { name: adminName, phone: adminPhone, password: adminHash, role: "Admin" },
+    update: { name: adminName, password: adminHash, role: "ADMIN", status: "ACTIVE" },
+    create: { name: adminName, phone: adminPhone, password: adminHash, role: "ADMIN" },
   });
 
   // Créer / mettre à jour Agent
   const agentHash = await bcrypt.hash(agentPassword, 10);
   const agent = await prisma.user.upsert({
     where:  { phone: agentPhone },
-    update: { name: agentName, password: agentHash, role: "Agent", suspended: false },
-    create: { name: agentName, phone: agentPhone, password: agentHash, role: "Agent" },
+    update: { name: agentName, password: agentHash, role: "AGENT", status: "ACTIVE" },
+    create: { name: agentName, phone: agentPhone, password: agentHash, role: "AGENT" },
   });
 
   // Créer les statuts par défaut (seulement si aucun n'existe)

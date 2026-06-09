@@ -21,7 +21,7 @@ export async function GET() {
 
     const headers = ["Customer", "Product", "City", "Status", "Revenue (MRU)"];
     const rows = orders.map((o) =>
-      [o.customer, o.product.name, o.city, o.status.name, o.revenue].join(",")
+      [o.customer, o.product.name, o.city ?? "", o.status?.name ?? "", o.revenue].join(",")
     );
     const csv = [headers.join(","), ...rows].join("\n");
 

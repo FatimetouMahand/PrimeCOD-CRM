@@ -1,103 +1,88 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { notifyAgentNewOrder } from "@/lib/telegram";
 
-const ONLINE_MS = 2 * 60 * 1000; // 2 minutes
+const ONLINE_MS = 2 * 60 * 1000;
 
-// Select best agent for a product using load balancing.
-// "Best" = online, non-suspended, fewest unconfirmed orders.
 async function selectAgent(productId: string): Promise<string | null> {
   const threshold = new Date(Date.now() - ONLINE_MS);
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    include: {
-      agents: { include: { agent: true } },
-    },
+    include: { agents: { include: { agent: true } } },
   });
   if (!product) return null;
 
-  let eligibleAgents: { id: string; name: string }[] = [];
+  const { assignedAgentIds, hiddenForAgentIds } = product;
 
-  if (product.distributionType === "specific" && product.agents.length > 0) {
-    // Only agents assigned to this product
-    eligibleAgents = product.agents
-      .filter(
-        (pa) =>
-          !pa.agent.suspended &&
-          pa.agent.isOnline &&
-          pa.agent.lastSeenAt &&
-          pa.agent.lastSeenAt >= threshold
-      )
-      .map((pa) => ({ id: pa.agent.id, name: pa.agent.name }));
-  } else {
-    // All online non-suspended agents (random distribution)
-    eligibleAgents = await prisma.user.findMany({
-      where: {
-        role: "Agent",
-        suspended: false,
-        isOnline: true,
-        lastSeenAt: { gte: threshold },
-      },
-      select: { id: true, name: true },
-    });
-  }
+  // Fetch all eligible agents
+  const allAgents = await prisma.user.findMany({
+    where: {
+      role:      { in: ["AGENT", "AGENT_TEST"] },
+      status:    "ACTIVE",
+      isOnline:  true,
+      lastSeenAt: { gte: threshold },
+    },
+    select: { id: true, name: true },
+  });
+
+  const activeRequired = assignedAgentIds.filter(id => allAgents.some(a => a.id === id));
+
+  let eligibleAgents = activeRequired.length > 0
+    ? allAgents.filter(a => activeRequired.includes(a.id) && !hiddenForAgentIds.includes(a.id))
+    : allAgents.filter(a => !hiddenForAgentIds.includes(a.id));
 
   if (eligibleAgents.length === 0) return null;
 
-  // Count active (non-final) orders per eligible agent
   const counts = await Promise.all(
     eligibleAgents.map(async (a) => ({
-      id: a.id,
-      count: await prisma.order.count({
-        where: {
-          agentId: a.id,
-          status: { isFinal: false },
-        },
-      }),
+      id:    a.id,
+      name:  a.name ?? "Agent",
+      count: await prisma.order.count({ where: { agentId: a.id, status: { isFinal: false } } }),
     }))
   );
 
-  // Pick agent with minimum unconfirmed count
   counts.sort((a, b) => a.count - b.count);
   return counts[0].id;
 }
 
-// POST /api/orders/distribute
-// Body: { orderId }
-// Assigns the order to the best available agent
 export async function POST(request: Request) {
   try {
     const { orderId } = await request.json();
-
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { product: true },
+    });
+    if (!order) return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
 
     const agentId = await selectAgent(order.productId);
-
     if (!agentId) {
-      return NextResponse.json({
-        message: "No online agents available — order queued",
-        agentId: null,
-      });
+      return NextResponse.json({ message: "Aucun agent disponible", agentId: null });
     }
 
     const updated = await prisma.order.update({
       where: { id: orderId },
-      data: { agentId },
+      data:  { agentId, assignedAt: new Date() },
       include: { agent: true },
     });
+
+    // Telegram notification
+    if (updated.agent?.telegramChatId) {
+      await notifyAgentNewOrder(
+        updated.agent.name ?? "Agent",
+        updated.agent.telegramChatId,
+        order.orderNumber ?? 0,
+        order.product.name
+      );
+    }
 
     return NextResponse.json({ success: true, agentId, agent: updated.agent });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Distribution failed" }, { status: 500 });
+    return NextResponse.json({ error: "Distribution échouée" }, { status: 500 });
   }
 }
 
-// GET /api/orders/distribute?productId=xxx
-// Returns the best agent for a product (preview without assigning)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

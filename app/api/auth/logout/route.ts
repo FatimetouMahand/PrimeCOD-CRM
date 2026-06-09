@@ -13,10 +13,13 @@ export async function POST() {
         const payload = verifyToken(token) as { id: string };
         await prisma.user.update({
           where: { id: payload.id },
-          data: { isOnline: false },
+          data: {
+            isOnline:    false,
+            lastLogoutAt: new Date(),
+          },
         });
       } catch {
-        // Token invalid — still clear cookie
+        // Token invalide — on efface quand même le cookie
       }
     }
 
@@ -25,6 +28,6 @@ export async function POST() {
     return res;
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

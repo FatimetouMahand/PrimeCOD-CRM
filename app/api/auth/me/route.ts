@@ -12,12 +12,26 @@ export async function GET() {
     const payload = verifyToken(token) as { id: string };
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
-      select: { id: true, name: true, phone: true, role: true, suspended: true, isOnline: true },
+      select: {
+        id: true, name: true, phone: true, role: true,
+        status: true, isOnline: true, iconColor: true,
+        canViewOrders: true, canEditOrders: true,
+        canViewUsers: true, canEditUsers: true,
+        canViewProducts: true, canEditProducts: true,
+        canViewStatuses: true, canEditStatuses: true,
+        canViewReporting: true, canViewDashboard: true,
+      },
     });
 
-    if (!user || user.suspended) {
+    if (!user || user.status !== "ACTIVE") {
       return NextResponse.json({ user: null }, { status: 401 });
     }
+
+    // Heartbeat
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastSeenAt: new Date(), isOnline: true },
+    }).catch(() => {});
 
     return NextResponse.json({ user });
   } catch {

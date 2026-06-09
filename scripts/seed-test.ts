@@ -58,7 +58,7 @@ async function main() {
     const agent = await prisma.user.upsert({
       where: { phone: a.phone },
       update: {},
-      create: { name: a.name, phone: a.phone, password: hashed, role: "Agent" },
+      create: { name: a.name, phone: a.phone, password: hashed, role: "AGENT" },
     });
     agents.push({ ...agent, plainPassword: a.password });
   }

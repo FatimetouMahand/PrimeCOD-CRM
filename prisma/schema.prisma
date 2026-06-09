@@ -7,32 +7,85 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id         String    @id @default(cuid())
-  name       String
-  phone      String    @unique
-  password   String
-  role       String
-  suspended  Boolean   @default(false)
-  isOnline   Boolean   @default(false)
-  lastSeenAt DateTime?
-  startDate  DateTime?
-  createdAt  DateTime  @default(now())
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
-  orders             Order[]
-  productAssignments ProductAgent[]
+enum Role {
+  ADMIN
+  SUPERVISOR
+  AGENT
+  AGENT_TEST
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id                   String     @id @default(cuid())
+  name                 String?
+  phone                String     @unique
+  password             String
+  encryptedPassword    String?    // AES-256 encrypted — for admin display only
+  role                 Role       @default(AGENT_TEST)
+  status               UserStatus @default(ACTIVE)
+
+  // Avatar & display
+  iconColor            String     @default("#2563eb")
+  roleColor            String     @default("#f3f4f6")
+
+  // Payment cycle
+  paymentRemainingDays Int        @default(0)
+  paymentDefaultDays   Int        @default(0)
+  paymentStartDate     DateTime   @default(now())
+
+  // Activity tracking
+  lastLoginAt          DateTime?
+  lastLogoutAt         DateTime?
+  lastSeenAt           DateTime?
+  isOnline             Boolean    @default(false)
+
+  // Telegram
+  telegramChatId       String?
+
+  // Granular permissions (ignored for ADMIN — always true)
+  canViewOrders        Boolean    @default(false)
+  canEditOrders        Boolean    @default(false)
+  canViewUsers         Boolean    @default(false)
+  canEditUsers         Boolean    @default(false)
+  canViewProducts      Boolean    @default(false)
+  canEditProducts      Boolean    @default(false)
+  canViewStatuses      Boolean    @default(false)
+  canEditStatuses      Boolean    @default(false)
+  canViewReporting     Boolean    @default(false)
+  canViewDashboard     Boolean    @default(false)
+
+  startDate            DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  orders               Order[]
+  productAssignments   ProductAgent[]
 }
 
 model Product {
-  id               String   @id @default(cuid())
-  name             String
-  code             String   @unique
-  price            Float    @default(0)
-  distributionType String   @default("random")
-  createdAt        DateTime @default(now())
+  id                String    @id @default(cuid())
+  name              String
+  code              String    @unique
+  shopifyId         String?   @unique
+  price             Float     @default(0)
+  distributionType  String    @default("random")
+  assignedAgentIds  String[]  @default([])   // Specific agents for this product
+  hiddenForAgentIds String[]  @default([])   // Agents blocked from seeing this product
+  vendor            String?
+  productType       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  orders Order[]
-  agents ProductAgent[]
+  orders  Order[]
+  agents  ProductAgent[]
 }
 
 model ProductAgent {
@@ -49,11 +102,39 @@ model Status {
   name            String
   color           String
   isActive        Boolean  @default(true)
-  isFinal         Boolean  @default(false)  // true = commande terminée (ex: Confirmée, Rejetée) → pas redistribuée
-  alertAfterHours Int?
+  isFinal         Boolean  @default(false)   // true = commande terminée (Confirmée, Rejetée…)
+  isArchived      Boolean  @default(false)   // Supprimé logiquement — conservé sur anciennes commandes
+  alertAfterHours Int?                       // Déclencher rappel après X heures
   createdAt       DateTime @default(now())
 
   orders Order[]
+}
+
+model Order {
+  id                String    @id @default(cuid())
+  orderNumber       Int?      @unique          // Numéro Shopify
+  customer          String
+  phone             String    @default("")
+  city              String?
+  price             Float
+  quantity          Int       @default(1)
+  revenue           Float
+  notes             String?
+  attempts          Int       @default(0)      // Nombre de tentatives d'appel
+  recallAt          DateTime?                  // Date de rappel planifié
+  assignedAt        DateTime?                  // Date d'attribution à l'agent
+  firstProcessedAt  DateTime?                  // Première modification de statut
+  processingTimeMin Int?                       // Temps de traitement en minutes (heures ouvrées)
+  absoluteDelayMin  Int?                       // Délai absolu en minutes (sans filtrage heures ouvrées)
+  statusId          String?
+  productId         String
+  agentId           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  status  Status?  @relation(fields: [statusId], references: [id])
+  product Product  @relation(fields: [productId], references: [id])
+  agent   User?    @relation(fields: [agentId], references: [id])
 }
 
 model ShopifyStore {
@@ -66,28 +147,19 @@ model ShopifyStore {
   createdAt     DateTime @default(now())
 }
 
+model SystemSettings {
+  id                  String   @id @default("default")
+  assignmentBatchSize Int      @default(1)    // Max commandes non-traitées avant de passer au suivant
+  maxRecallAttempts   Int      @default(3)
+  workStart           String   @default("10:00")
+  workEnd             String   @default("22:00")
+  workDays            Int[]    @default([1, 2, 3, 4, 5, 6, 0])  // 0=Dimanche
+  breakStart          String?  @default("13:30")
+  breakEnd            String?  @default("14:30")
+  updatedAt           DateTime @updatedAt
+}
+
 model Settings {
   key   String @id
   value String
-}
-
-model Order {
-  id        String   @id @default(cuid())
-  customer  String
-  phone     String
-  city      String
-  price     Float
-  quantity  Int
-  revenue   Float
-  notes     String?
-  attempts  Int      @default(0)
-  statusId  String
-  productId String
-  agentId   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  status  Status  @relation(fields: [statusId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-  agent   User?   @relation(fields: [agentId], references: [id])
 }
