@@ -5,6 +5,7 @@ const PUBLIC_PREFIXES = [
   "/login",
   "/api/auth",
   "/api/webhooks",
+  "/api/admin/setup",   // One-time DB migration — secured by key param
   "/_next",
   "/favicon",
 ];
