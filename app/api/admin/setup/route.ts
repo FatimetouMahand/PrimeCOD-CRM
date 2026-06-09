@@ -144,8 +144,13 @@ export async function GET(request: Request) {
           WHERE table_name = 'User' AND column_name = 'status' AND udt_name = 'UserStatus'
         ) THEN
           -- Normalize values first
-          UPDATE "User" SET "status" = 'ACTIVE'   WHERE "status" NOT IN ('ACTIVE','INACTIVE');
+          UPDATE "User" SET "status" = 'ACTIVE' WHERE "status" NOT IN ('ACTIVE','INACTIVE');
+          -- Drop default before cast (TEXT default can't auto-cast to enum)
+          ALTER TABLE "User" ALTER COLUMN "status" DROP DEFAULT;
+          -- Convert column type
           ALTER TABLE "User" ALTER COLUMN "status" TYPE "UserStatus" USING "status"::"UserStatus";
+          -- Restore default as enum value
+          ALTER TABLE "User" ALTER COLUMN "status" SET DEFAULT 'ACTIVE'::"UserStatus";
         END IF;
       END $$;
     `);
