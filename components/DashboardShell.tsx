@@ -26,11 +26,12 @@ const NAV_AGENT = [
   { href: "/orders",    label: "Mes Commandes",  Icon: ShoppingCart },
 ];
 
-// Pages allowed per role
+// Pages allowed per role (new enum names)
 const ALLOWED: Record<string, string[]> = {
-  Admin:      ["/dashboard", "/orders", "/employees", "/products", "/statuses", "/settings"],
-  Supervisor: ["/dashboard", "/orders", "/products", "/statuses"],
-  Agent:      ["/dashboard", "/orders"],
+  ADMIN:      ["/dashboard", "/orders", "/employees", "/products", "/statuses", "/settings"],
+  SUPERVISOR: ["/dashboard", "/orders", "/products", "/statuses"],
+  AGENT:      ["/dashboard", "/orders"],
+  AGENT_TEST: ["/dashboard", "/orders"],
 };
 
 // Mobile breakpoint
@@ -65,12 +66,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   // Redirect if user tries to access a page they're not allowed to
   useEffect(() => {
     if (!user) return;
-    const allowed = ALLOWED[user.role] ?? ALLOWED.Agent;
+    const allowed = ALLOWED[user.role] ?? ALLOWED.AGENT;
     const ok = allowed.some(p => pathname === p || pathname.startsWith(p + "/"));
     if (!ok) router.replace("/dashboard");
   }, [user, pathname, router]);
 
-  const navItems = user?.role === "Agent" ? NAV_AGENT : NAV_ADMIN;
+  const navItems = (user?.role === "AGENT" || user?.role === "AGENT_TEST") ? NAV_AGENT : NAV_ADMIN;
 
   // Sidebar width logic:
   // - Mobile: always 240px when open (overlay), 0 when closed
@@ -144,7 +145,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5,
               whiteSpace: "nowrap",
             }}>
-              {user.role === "Admin" ? "⚙ Administration" : "📋 Agent"}
+              {user.role === "ADMIN" ? "⚙ Administration" : user.role === "SUPERVISOR" ? "👁 Superviseur" : "📋 Agent"}
             </div>
           )}
 
