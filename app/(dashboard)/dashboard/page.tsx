@@ -233,26 +233,16 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          padding: "20px",
-          fontSize: "12px",
-        }}
-      >
-        Loading...
+      <div style={{ padding: "20px", fontSize: "12px", color: "#9ca3af" }}>
+        Chargement…
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div
-        style={{
-          padding: "20px",
-          fontSize: "12px",
-        }}
-      >
-        No database data
+      <div style={{ padding: "20px", fontSize: "12px", color: "#9ca3af" }}>
+        Aucune donnée
       </div>
     );
   }
@@ -278,7 +268,7 @@ export default function DashboardPage() {
               marginBottom: "3px",
             }}
           >
-            Dashboard
+            Tableau de bord
           </h1>
 
           <p
@@ -287,7 +277,7 @@ export default function DashboardPage() {
               fontSize: "11px",
             }}
           >
-            Shopify CRM Analytics
+            Vue d&apos;ensemble des performances
           </p>
         </div>
 
@@ -314,7 +304,7 @@ export default function DashboardPage() {
       cursor: "pointer",
     }}
   >
-    Export PDF
+    Exporter PDF
   </button>
 
   <button
@@ -332,7 +322,7 @@ export default function DashboardPage() {
       cursor: "pointer",
     }}
   >
-    Export Excel
+    Exporter Excel
   </button>
 </div>
 
@@ -350,42 +340,27 @@ export default function DashboardPage() {
           alignItems: "center",
         }}
       >
-        {[
-          "Today",
-          "This Week",
-          "This Month",
-          "Custom Range",
-        ].map((item) => (
+        {([
+          ["Today", "Aujourd'hui"],
+          ["This Week", "Cette semaine"],
+          ["This Month", "Ce mois"],
+          ["Custom Range", "Personnalisé"],
+        ] as const).map(([value, label]) => (
           <button
-            key={item}
-            onClick={() =>
-              setSelectedFilter(
-                item
-              )
-            }
+            key={value}
+            onClick={() => setSelectedFilter(value)}
             style={{
-              border:
-                "1px solid #e5e7eb",
-
-              background:
-                selectedFilter ===
-                item
-                  ? "#0d3938" : "white",
-
-              color:
-                selectedFilter ===
-                item
-                  ? "white"
-                  : "#111827",
-
-              padding: "8px 12px",
+              border: "1px solid #e5e7eb",
+              background: selectedFilter === value ? "#0d3938" : "white",
+              color: selectedFilter === value ? "white" : "#111827",
+              padding: "7px 12px",
               borderRadius: "10px",
               fontSize: "11px",
               fontWeight: "600",
               cursor: "pointer",
             }}
           >
-            {item}
+            {label}
           </button>
         ))}
 
@@ -536,9 +511,9 @@ export default function DashboardPage() {
         style={{
           display: "grid",
           gridTemplateColumns:
-            "repeat(auto-fit,minmax(170px,1fr))",
-          gap: "12px",
-          marginBottom: "18px",
+            "repeat(auto-fit,minmax(148px,1fr))",
+          gap: "8px",
+          marginBottom: "14px",
         }}
       >
         {(
@@ -602,7 +577,7 @@ export default function DashboardPage() {
           >
             <div
               style={{
-                padding: "13px",
+                padding: "10px 12px",
               }}
             >
               <div
@@ -618,11 +593,14 @@ export default function DashboardPage() {
                   <p
                     style={{
                       fontSize:
-                        "10px",
+                        "9px",
                       color:
                         "#6b7280",
                       marginBottom:
-                        "4px",
+                        "3px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                      fontWeight: 700,
                     }}
                   >
                     {item.title}
@@ -631,7 +609,7 @@ export default function DashboardPage() {
                   <h2
                     style={{
                       fontSize:
-                        "19px",
+                        "17px",
                       fontWeight:
                         "800",
                     }}
@@ -656,10 +634,10 @@ export default function DashboardPage() {
 
                 <div
                   style={{
-                    width: "36px",
-                    height: "36px",
+                    width: "30px",
+                    height: "30px",
                     borderRadius:
-                      "11px",
+                      "10px",
                     background:
                       item.bg,
                     display:
@@ -682,12 +660,13 @@ export default function DashboardPage() {
       {/* CHARTS */}
 
       <div
+        className="stack-mobile"
         style={{
           display: "grid",
           gridTemplateColumns:
             "2fr 1fr",
           gap: "12px",
-          marginBottom: "18px",
+          marginBottom: "14px",
         }}
       >
         {/* REVENUE */}
@@ -716,7 +695,7 @@ export default function DashboardPage() {
                       "700",
                   }}
                 >
-                  Revenue Analytics
+                  Analyse des revenus
                 </h2>
 
                 <p
@@ -727,7 +706,7 @@ export default function DashboardPage() {
                       "#9ca3af",
                   }}
                 >
-                  Sales report
+                  Rapport des ventes
                 </p>
               </div>
 
@@ -753,7 +732,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                No revenue data
+                Aucune donnée
               </div>
             ) : (
               <div
@@ -807,7 +786,7 @@ export default function DashboardPage() {
                   "14px",
               }}
             >
-              Orders Status
+              Statut des commandes
             </h2>
 
             {data.statusStats
@@ -827,7 +806,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                No data yet
+                Aucune donnée
               </div>
             ) : (
               <>
@@ -957,12 +936,13 @@ export default function DashboardPage() {
       {/* TOP */}
 
       <div
+        className="stack-mobile"
         style={{
           display: "grid",
           gridTemplateColumns:
             "1fr 1fr",
           gap: "12px",
-          marginBottom: "18px",
+          marginBottom: "14px",
         }}
       >
         {/* PRODUCTS */}
@@ -995,7 +975,7 @@ export default function DashboardPage() {
                     "700",
                 }}
               >
-                Top Products
+                Meilleurs produits
               </h2>
             </div>
 
@@ -1009,7 +989,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                No products yet
+                Aucun produit
               </p>
             ) : (
               <>
@@ -1113,7 +1093,7 @@ export default function DashboardPage() {
                     "700",
                 }}
               >
-                Top Agents
+                Meilleurs agents
               </h2>
             </div>
 
@@ -1127,7 +1107,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                No agents yet
+                Aucun agent
               </p>
             ) : (
               data.topAgents?.map(
@@ -1273,7 +1253,7 @@ export default function DashboardPage() {
               marginBottom: "12px",
             }}
           >
-            Recent Orders
+            Commandes récentes
           </h2>
 
           <table
@@ -1292,50 +1272,11 @@ export default function DashboardPage() {
                     "1px solid #e5e7eb",
                 }}
               >
-                <th
-                  style={{
-                    paddingBottom:
-                      "10px",
-                  }}
-                >
-                  Customer
-                </th>
-
-                <th
-                  style={{
-                    paddingBottom:
-                      "10px",
-                  }}
-                >
-                  Product
-                </th>
-
-                <th
-                  style={{
-                    paddingBottom:
-                      "10px",
-                  }}
-                >
-                  City
-                </th>
-
-                <th
-                  style={{
-                    paddingBottom:
-                      "10px",
-                  }}
-                >
-                  Status
-                </th>
-
-                <th
-                  style={{
-                    paddingBottom:
-                      "10px",
-                  }}
-                >
-                  Amount
-                </th>
+                <th style={{ paddingBottom: "10px" }}>Client</th>
+                <th style={{ paddingBottom: "10px" }}>Produit</th>
+                <th style={{ paddingBottom: "10px" }}>Ville</th>
+                <th style={{ paddingBottom: "10px" }}>Statut</th>
+                <th style={{ paddingBottom: "10px" }}>Montant</th>
               </tr>
             </thead>
 
@@ -1351,7 +1292,7 @@ export default function DashboardPage() {
                       color: "#9ca3af",
                     }}
                   >
-                    No orders found
+                    Aucune commande
                   </td>
                 </tr>
               ) : (
