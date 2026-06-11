@@ -10,11 +10,19 @@ export function SessionBar() {
   const user   = useUser();
 
   useEffect(() => {
-    const ping = () => fetch("/api/heartbeat", { method: "POST" }).catch(() => {});
+    const ping = () => {
+      fetch("/api/heartbeat", { method: "POST" })
+        .then(r => r.json())
+        .then(d => {
+          // Déconnexion à distance : un admin a forcé la déconnexion de ce compte.
+          if (d?.forceLogout) router.replace("/login");
+        })
+        .catch(() => {});
+    };
     ping();
     const id = setInterval(ping, 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [router]);
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

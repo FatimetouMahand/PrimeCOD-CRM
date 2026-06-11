@@ -83,14 +83,74 @@ export async function GET(request: Request) {
 
     let stats = null;
     if (!cursor && total !== null) {
+      // "À rappeler" = commandes dont le rappel programmé est dépassé,
+      // sans tenir compte du filtre de date (besoin global, comme l'ancien système)
+      const whereNoDate: Record<string, unknown> = { ...where };
+      delete whereNoDate.createdAt;
+
       // Confirmed = statuts marqués comme finaux (Confirmée, Confirmed…)
       // Pending = statuts non-finaux (En attente, Pending, Ne répond pas…)
-      const [confirmed, pending, rev] = await Promise.all([
+      const [confirmed, pending, rev, procAgg, toRecall] = await Promise.all([
         prisma.order.count({ where: { ...where, status: { isFinal: true } } }),
         prisma.order.count({ where: { ...where, status: { isFinal: false } } }),
         prisma.order.aggregate({ where, _sum: { revenue: true } }),
+        prisma.order.aggregate({ where: { ...where, processingTimeMin: { not: null } }, _avg: { processingTimeMin: true } }),
+        prisma.order.count({ where: { ...whereNoDate, recallAt: { lt: new Date() } } }),
       ]);
-      stats = { total, confirmed, pending, revenue: rev._sum.revenue ?? 0 };
+
+      const revenue = rev._sum.revenue ?? 0;
+      const confirmationRate = total > 0 ? Number(((confirmed / total) * 100).toFixed(1)) : 0;
+      const avgProcessingTimeMin = procAgg._avg.processingTimeMin != null
+        ? Math.round(procAgg._avg.processingTimeMin)
+        : null;
+
+      stats = {
+        total, confirmed, pending, revenue,
+        confirmationRate, avgProcessingTimeMin, toRecall,
+        totalGrowth: null as number | null,
+        revenueGrowth: null as number | null,
+        confirmedGrowth: null as number | null,
+        pendingGrowth: null as number | null,
+        confirmationRateGrowth: null as number | null,
+        avgProcessingGrowth: null as number | null,
+      };
+
+      // ── Croissance vs période précédente (même intervalle, décalé de -1 jour) ──
+      // Permet d'afficher les indicateurs +X% / -X% par rapport à hier (CLAUDE.md)
+      if (createdAtFilter?.gte && createdAtFilter?.lte) {
+        const dayMs = 24 * 60 * 60 * 1000;
+        const prevWhere: Record<string, unknown> = {
+          ...where,
+          createdAt: {
+            gte: new Date(createdAtFilter.gte.getTime() - dayMs),
+            lte: new Date(createdAtFilter.lte.getTime() - dayMs),
+          },
+        };
+
+        const [prevTotal, prevConfirmed, prevPending, prevRev, prevProcAgg] = await Promise.all([
+          prisma.order.count({ where: prevWhere }),
+          prisma.order.count({ where: { ...prevWhere, status: { isFinal: true } } }),
+          prisma.order.count({ where: { ...prevWhere, status: { isFinal: false } } }),
+          prisma.order.aggregate({ where: prevWhere, _sum: { revenue: true } }),
+          prisma.order.aggregate({ where: { ...prevWhere, processingTimeMin: { not: null } }, _avg: { processingTimeMin: true } }),
+        ]);
+
+        const prevRevenue = prevRev._sum.revenue ?? 0;
+        const prevConfirmationRate = prevTotal > 0 ? (prevConfirmed / prevTotal) * 100 : 0;
+        const prevAvgProcessing = prevProcAgg._avg.processingTimeMin ?? null;
+
+        const growth = (curr: number, prev: number) =>
+          prev === 0 ? (curr > 0 ? 100 : 0) : Number((((curr - prev) / prev) * 100).toFixed(1));
+
+        stats.totalGrowth     = growth(total, prevTotal);
+        stats.revenueGrowth   = growth(revenue, prevRevenue);
+        stats.confirmedGrowth = growth(confirmed, prevConfirmed);
+        stats.pendingGrowth   = growth(pending, prevPending);
+        stats.confirmationRateGrowth = Number((confirmationRate - prevConfirmationRate).toFixed(1));
+        stats.avgProcessingGrowth = (avgProcessingTimeMin != null && prevAvgProcessing != null)
+          ? growth(avgProcessingTimeMin, prevAvgProcessing)
+          : null;
+      }
     }
 
     return NextResponse.json({ orders: data, nextCursor, stats });

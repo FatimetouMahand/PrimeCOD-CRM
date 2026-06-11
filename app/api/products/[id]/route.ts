@@ -7,35 +7,27 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { name, price, distributionType, agentIds } = await request.json();
+    const { name, price, distributionType, agentIds, hiddenAgentIds } = await request.json();
 
-    // Update product fields
+    // Update product fields. assignedAgentIds / hiddenForAgentIds sont les
+    // champs réellement utilisés par la distribution des commandes
+    // (app/api/orders/distribute + webhook Shopify) — on les écrit
+    // directement au lieu de la table de jointure ProductAgent (ignorée
+    // par la distribution).
     await prisma.product.update({
       where: { id },
       data: {
         ...(name  !== undefined ? { name  } : {}),
         ...(price !== undefined ? { price } : {}),
         ...(distributionType !== undefined ? { distributionType } : {}),
+        ...(agentIds       !== undefined ? { assignedAgentIds:  { set: agentIds } } : {}),
+        ...(hiddenAgentIds !== undefined ? { hiddenForAgentIds: { set: hiddenAgentIds } } : {}),
       },
     });
 
-    // Sync agent assignments if provided
-    if (agentIds !== undefined) {
-      await prisma.productAgent.deleteMany({ where: { productId: id } });
-      if (agentIds.length > 0) {
-        await prisma.productAgent.createMany({
-          data: agentIds.map((agentId: string) => ({ productId: id, agentId })),
-          skipDuplicates: true,
-        });
-      }
-    }
-
     const updated = await prisma.product.findUnique({
       where: { id },
-      include: {
-        _count: { select: { orders: true } },
-        agents: { include: { agent: { select: { id: true, name: true } } } },
-      },
+      include: { _count: { select: { orders: true } } },
     });
 
     return NextResponse.json({ product: updated });

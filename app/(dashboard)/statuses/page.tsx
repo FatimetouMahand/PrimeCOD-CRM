@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, Check, Bell, BellOff, Power } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, Bell, BellOff, Power, ListChecks, CheckCircle2, Flag } from "lucide-react";
 
 interface Status {
   id: string;
@@ -131,6 +131,26 @@ export default function StatusesPage() {
         >
           <Plus size={14} /> Ajouter un statut
         </button>
+      </div>
+
+      {/* Quick stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
+        {[
+          { label: "Total statuts",  value: statuses.length,                                      icon: <ListChecks  size={14}/>, bg: "#beecdf" },
+          { label: "Actifs",         value: active.length,                                        icon: <CheckCircle2 size={14}/>, bg: "#dcfce7" },
+          { label: "Avec alerte",    value: statuses.filter(s => s.alertAfterHours).length,       icon: <Bell        size={14}/>, bg: "#fef3c7" },
+          { label: "Statuts finaux", value: statuses.filter(s => s.isFinal).length,                icon: <Flag        size={14}/>, bg: "#dbeafe" },
+        ].map(s => (
+          <div key={s.label} className="glass-card">
+            <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>{s.label}</p>
+                <h2 style={{ fontSize: 18, fontWeight: 800 }}>{s.value}</h2>
+              </div>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Add / Edit form */}
@@ -340,10 +360,12 @@ export default function StatusesPage() {
               <Trash2 size={22} color="#ef4444" />
             </div>
             <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>
-              Désactiver ce statut ?
+              Supprimer ce statut ?
             </h3>
             <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 22, lineHeight: 1.6 }}>
-              Il n&apos;apparaîtra plus dans les choix, mais les anciennes commandes <strong>garderont leur étiquette</strong>.
+              Il n&apos;apparaîtra plus dans le formulaire ni dans les filtres, mais les anciennes commandes <strong>garderont leur étiquette</strong>.
+              <br /><br />
+              Pour le réactiver/désactiver temporairement sans le supprimer, utilisez plutôt le bouton <Power size={11} style={{ display: "inline", verticalAlign: "middle" }} /> sur la ligne du statut.
             </p>
             <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
               <button
@@ -356,7 +378,7 @@ export default function StatusesPage() {
                 onClick={doDelete}
                 style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: "#ef4444", color: "white", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
               >
-                Désactiver
+                Supprimer
               </button>
             </div>
           </div>

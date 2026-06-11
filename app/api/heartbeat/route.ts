@@ -11,7 +11,20 @@ export async function POST() {
     const token = cookieStore.get("crm_token")?.value;
     if (!token) return NextResponse.json({ ok: false });
 
-    const payload = verifyToken(token) as { id: string };
+    const payload = verifyToken(token) as { id: string; iat?: number };
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+      select: { lastLogoutAt: true },
+    });
+
+    // Déconnexion à distance (page Employés → "Déconnecter à distance") :
+    // l'admin a forcé une déconnexion APRÈS l'émission de ce jeton.
+    if (payload.iat && user?.lastLogoutAt && user.lastLogoutAt.getTime() > payload.iat * 1000) {
+      const res = NextResponse.json({ ok: false, forceLogout: true });
+      res.cookies.set("crm_token", "", { maxAge: 0, path: "/" });
+      return res;
+    }
 
     await prisma.user.update({
       where: { id: payload.id },

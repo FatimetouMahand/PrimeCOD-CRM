@@ -21,11 +21,31 @@ function generateCode(name: string): string {
 
 export async function GET() {
   try {
+    // Migration ponctuelle : avant correctif, les affectations "Distribution
+    // spécifique" étaient enregistrées uniquement dans la table de jointure
+    // ProductAgent — un champ jamais lu par la distribution réelle des
+    // commandes (app/api/orders/distribute + webhook Shopify, qui se basent
+    // sur assignedAgentIds). On recopie ces anciennes affectations pour
+    // qu'elles redeviennent actives, sans perdre la configuration existante.
+    try {
+      const legacy = await prisma.product.findMany({
+        where: { distributionType: "specific", assignedAgentIds: { isEmpty: true } },
+        include: { agents: { select: { agentId: true } } },
+      });
+      for (const p of legacy) {
+        if (p.agents.length > 0) {
+          await prisma.product.update({
+            where: { id: p.id },
+            data: { assignedAgentIds: { set: p.agents.map((a) => a.agentId) } },
+          });
+        }
+      }
+    } catch (migErr) {
+      console.error("Product agent migration failed:", migErr);
+    }
+
     const products = await prisma.product.findMany({
-      include: {
-        _count: { select: { orders: true } },
-        agents: { include: { agent: { select: { id: true, name: true } } } },
-      },
+      include: { _count: { select: { orders: true } } },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ products });
@@ -37,7 +57,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name, price, distributionType, agentIds } = await request.json();
+    const { name, price, distributionType, agentIds, hiddenAgentIds } = await request.json();
     if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
     // Auto-generate unique code
@@ -54,20 +74,49 @@ export async function POST(request: Request) {
         code,
         price: price ?? 0,
         distributionType: distributionType ?? "random",
-        agents: agentIds?.length
-          ? { create: agentIds.map((id: string) => ({ agentId: id })) }
-          : undefined,
+        // Champs réellement utilisés par la distribution des commandes
+        // (app/api/orders/distribute + webhook Shopify)
+        assignedAgentIds: agentIds ?? [],
+        hiddenForAgentIds: hiddenAgentIds ?? [],
       },
-      include: {
-        _count: { select: { orders: true } },
-        agents: { include: { agent: { select: { id: true, name: true } } } },
-      },
+      include: { _count: { select: { orders: true } } },
     });
 
     return NextResponse.json({ product }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Create failed" }, { status: 500 });
+  }
+}
+
+// Modification groupée (Actions groupées) — applique des changements à
+// plusieurs produits sélectionnés en une seule requête.
+export async function PATCH(request: Request) {
+  try {
+    const { ids, price, distributionType, agentIds, hiddenAgentIds } = await request.json();
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: "No IDs" }, { status: 400 });
+    }
+
+    const data: Record<string, unknown> = {};
+    if (price !== undefined)            data.price = price;
+    if (distributionType !== undefined) data.distributionType = distributionType;
+    if (agentIds !== undefined)         data.assignedAgentIds = { set: agentIds };
+    if (hiddenAgentIds !== undefined)   data.hiddenForAgentIds = { set: hiddenAgentIds };
+
+    if (Object.keys(data).length > 0) {
+      await prisma.product.updateMany({ where: { id: { in: ids } }, data });
+    }
+
+    const products = await prisma.product.findMany({
+      where: { id: { in: ids } },
+      include: { _count: { select: { orders: true } } },
+    });
+
+    return NextResponse.json({ products });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Bulk update failed" }, { status: 500 });
   }
 }
 

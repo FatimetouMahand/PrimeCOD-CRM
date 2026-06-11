@@ -33,10 +33,15 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    // Soft delete — deactivate so old orders keep the label
+    // Suppression logique (isArchived) : le statut disparaît des choix futurs
+    // (formulaire d'ajout/édition, filtres, changement de statut...) mais les
+    // commandes existantes qui le référencent encore conservent leur étiquette.
+    // On désactive aussi isActive pour que ce statut ne soit plus jamais
+    // sélectionné comme statut par défaut des nouvelles commandes
+    // (cf. ensureStatuses() dans les webhooks Shopify).
     const status = await prisma.status.update({
       where: { id },
-      data: { isActive: false },
+      data: { isArchived: true, isActive: false },
     });
     return NextResponse.json({ status });
   } catch {

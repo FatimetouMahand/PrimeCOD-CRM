@@ -3,7 +3,11 @@ import { prisma } from "@/lib/db/prisma";
 
 export async function GET() {
   try {
+    // Les statuts supprimés (isArchived) n'apparaissent plus dans les choix
+    // (filtres, changement de statut…) mais restent en base : les anciennes
+    // commandes qui pointent encore dessus conservent leur étiquette.
     const statuses = await prisma.status.findMany({
+      where: { isArchived: false },
       orderBy: { createdAt: "asc" },
     });
     return NextResponse.json({ statuses });

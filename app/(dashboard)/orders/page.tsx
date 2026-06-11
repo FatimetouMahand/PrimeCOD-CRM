@@ -5,20 +5,28 @@ import {
   Search, Trash2, UserCheck, Bell, BarChart2,
   SlidersHorizontal, ChevronDown, X, Calendar,
   ShoppingCart, CheckCircle2, Clock3, DollarSign, PhoneCall,
+  ArrowUp, ArrowDown,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-interface Agent   { id: string; name: string; }
+interface Agent   { id: string; name: string; iconColor?: string; }
 interface Status  { id: string; name: string; color: string; alertAfterHours?: number | null; isFinal?: boolean; }
 interface Product { id: string; name: string; }
 interface Order {
   id: string; orderNumber: number | null; customer: string; phone: string; city: string;
   price: number; quantity: number; revenue: number; createdAt: string;
   notes: string | null; attempts: number; recallAt: string | null; processingTimeMin: number | null;
+  absoluteDelayMin: number | null;
   status: Status; product: Product; agent: Agent | null;
 }
-interface Stats { total: number; revenue: number; confirmed: number; pending: number; }
+interface Stats {
+  total: number; revenue: number; confirmed: number; pending: number;
+  toRecall: number; confirmationRate: number; avgProcessingTimeMin: number | null;
+  totalGrowth: number | null; revenueGrowth: number | null;
+  confirmedGrowth: number | null; pendingGrowth: number | null;
+  confirmationRateGrowth: number | null; avgProcessingGrowth: number | null;
+}
 
 // ── Column definitions ─────────────────────────────────────────────────────
 const COLS = [
@@ -74,6 +82,27 @@ function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Date longue en français → "11 juin 2026"
+function fmtLongDate(date: string) {
+  return new Date(date).toLocaleDateString("fr", { day: "2-digit", month: "long", year: "numeric" });
+}
+
+// Indicateur de croissance vs hier (CLAUDE.md : "+2%, -1%…")
+function GrowthBadge({ value, points = false }: { value?: number | null; points?: boolean }) {
+  if (value == null) return null;
+  const up = value >= 0;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 2,
+      fontSize: "10px", fontWeight: 700,
+      color: up ? "#16a34a" : "#dc2626",
+    }}>
+      {up ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+      {up ? "+" : ""}{value}{points ? " pts" : "%"}
+    </span>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function OrdersPage() {
   const [orders,      setOrders]      = useState<Order[]>([]);
@@ -94,6 +123,7 @@ export default function OrdersPage() {
     // Default: today
     return new Date().toISOString().slice(0, 10);
   });
+  const [filterDateTo,  setFilterDateTo]  = useState(""); // fin de plage (optionnel)
 
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [showStats,    setShowStats]    = useState(true);
@@ -114,15 +144,15 @@ export default function OrdersPage() {
 
   // ── Fetch orders ──────────────────────────────────────────────────────
   const load = useCallback(async (opts: {
-    cursor?: string; search?: string; statusId?: string; productId?: string; date?: string; append?: boolean;
+    cursor?: string; search?: string; statusId?: string; productId?: string; date?: string; dateTo?: string; append?: boolean;
   } = {}) => {
-    const { cursor, search: q = "", statusId = "", productId = "", date = "", append = false } = opts;
+    const { cursor, search: q = "", statusId = "", productId = "", date = "", dateTo = "", append = false } = opts;
     const p = new URLSearchParams();
     if (cursor)    p.set("cursor",    cursor);
     if (q)         p.set("search",    q);
     if (statusId)  p.set("statusId",  statusId);
     if (productId) p.set("productId", productId);
-    if (date)      { p.set("dateFrom", date); p.set("dateTo", date); }
+    if (date)      { p.set("dateFrom", date); p.set("dateTo", dateTo || date); }
 
     append ? setLoadingMore(true) : setLoading(true);
     try {
@@ -156,19 +186,19 @@ export default function OrdersPage() {
     if (!sentinel.current) return;
     const obs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && hasMore && !loadingMore) {
-        load({ cursor: nextCursor ?? undefined, search, statusId: filterStatus, productId: filterProduct, date: filterDate, append: true });
+        load({ cursor: nextCursor ?? undefined, search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo, append: true });
       }
     }, { threshold: 0.1 });
     obs.observe(sentinel.current);
     return () => obs.disconnect();
-  }, [hasMore, loadingMore, nextCursor, search, filterStatus, filterProduct, filterDate, load]);
+  }, [hasMore, loadingMore, nextCursor, search, filterStatus, filterProduct, filterDate, filterDateTo, load]);
 
   // ── Search (debounced 400ms) ──────────────────────────────────────────
   const handleSearch = (val: string) => {
     setSearch(val);
     if (searchTmr.current) clearTimeout(searchTmr.current);
     searchTmr.current = setTimeout(() => {
-      load({ search: val, statusId: filterStatus, productId: filterProduct, date: filterDate });
+      load({ search: val, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo });
     }, 400);
   };
 
@@ -177,24 +207,38 @@ export default function OrdersPage() {
     const s = key === "status"  ? val : filterStatus;
     const p = key === "product" ? val : filterProduct;
     key === "status" ? setFilterStatus(val) : setFilterProduct(val);
-    load({ search, statusId: s, productId: p, date: filterDate });
+    load({ search, statusId: s, productId: p, date: filterDate, dateTo: filterDateTo });
   };
 
-  // ── Date filter ───────────────────────────────────────────────────────
+  // ── Date filter (jour unique — réinitialise la plage) ─────────────────
   const handleDate = (val: string) => {
     setFilterDate(val);
-    load({ search, statusId: filterStatus, productId: filterProduct, date: val });
+    setFilterDateTo("");
+    load({ search, statusId: filterStatus, productId: filterProduct, date: val, dateTo: "" });
+  };
+
+  // ── Plage de dates (période) ───────────────────────────────────────────
+  const handleDateRange = (from: string, to: string) => {
+    setFilterDate(from);
+    setFilterDateTo(to);
+    load({ search, statusId: filterStatus, productId: filterProduct, date: from, dateTo: to });
+  };
+
+  const handleDateTo = (val: string) => {
+    setFilterDateTo(val);
+    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: val });
   };
 
   const clearDate = () => {
     setFilterDate("");
-    load({ search, statusId: filterStatus, productId: filterProduct, date: "" });
+    setFilterDateTo("");
+    load({ search, statusId: filterStatus, productId: filterProduct, date: "", dateTo: "" });
   };
 
   // ── Refresh ───────────────────────────────────────────────────────────
   const refresh = () => {
     setSelected(new Set());
-    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate });
+    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo });
   };
 
   // ── Selection ─────────────────────────────────────────────────────────
@@ -280,14 +324,20 @@ export default function OrdersPage() {
     }
   };
 
-  // ── Reminders: commandes non-finales avec alerte dépassée ─────────────
+  // ── Reminders: rappel programmé dépassé OU alerte de statut dépassée ──
   const reminders = orders.filter(o => {
+    // 1. Rappel programmé (recallAt) déjà dépassé → "À rappeler"
+    if (o.recallAt && new Date(o.recallAt).getTime() < Date.now()) return true;
+    // 2. Alerte de suivi du statut (alertAfterHours) dépassée
     if (o.status?.isFinal) return false;             // commande terminée → pas de rappel
     const hours = o.status?.alertAfterHours;
     if (!hours) return false;                         // pas d'alerte définie sur ce statut
     const elapsed = (Date.now() - new Date(o.createdAt).getTime()) / 3_600_000;
     return elapsed > hours;
   });
+
+  // Compteur global "à rappeler" (toutes pages confondues, via l'API)
+  const recallCount = stats?.toRecall ?? reminders.length;
 
   // ── Visible columns ───────────────────────────────────────────────────
   const visible = COLS.filter(c => visibleCols.has(c.key));
@@ -318,6 +368,9 @@ export default function OrdersPage() {
               color: o.agent ? "#111827" : "#9ca3af", fontWeight: 600,
             }}
           >
+            {o.agent?.iconColor && (
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: o.agent.iconColor, display: "inline-block", flexShrink: 0 }} />
+            )}
             {o.agent?.name ?? "Unassigned"} <ChevronDown size={10} />
           </button>
         );
@@ -336,14 +389,42 @@ export default function OrdersPage() {
             <PhoneCall size={10} /> {o.attempts ?? 0}
           </button>
         );
-      case "processing":
-        return <span style={{ color: "#6b7280", fontSize: "11px" }}>{fmtMinutes(o.processingTimeMin)}</span>;
+      case "processing": {
+        const { processingTimeMin, absoluteDelayMin } = o;
+        if (processingTimeMin == null && absoluteDelayMin == null) {
+          return <span style={{ color: "#d1d5db", fontStyle: "italic", fontSize: 11 }}>—</span>;
+        }
+        return (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ color: "#1F30AD", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap" }}>
+              {fmtMinutes(processingTimeMin)}
+            </span>
+            {absoluteDelayMin != null && absoluteDelayMin !== processingTimeMin && (
+              <span style={{ color: "#9ca3af", fontSize: 10, whiteSpace: "nowrap" }}>
+                Total : {fmtMinutes(absoluteDelayMin)}
+              </span>
+            )}
+          </div>
+        );
+      }
       case "recall": {
         const r = fmtRecall(o.recallAt);
         return (
-          <span style={{ color: r.overdue ? "#dc2626" : "#6b7280", fontSize: "11px", fontWeight: r.overdue ? 700 : 400, display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {r.overdue && <Bell size={10} />} {r.text}
-          </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
+            {r.overdue && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 3,
+                background: "#fee2e2", color: "#dc2626",
+                padding: "1px 6px", borderRadius: "999px",
+                fontSize: "9px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.02em",
+              }}>
+                <Bell size={9} /> À rappeler
+              </span>
+            )}
+            <span style={{ color: r.overdue ? "#dc2626" : "#6b7280", fontSize: "11px", fontWeight: r.overdue ? 700 : 400 }}>
+              {r.text}
+            </span>
+          </div>
         );
       }
       case "notes":
@@ -386,6 +467,11 @@ export default function OrdersPage() {
     }
   };
 
+  // ── Raccourcis de date (Aujourd'hui / Hier / 7 jours) ─────────────────
+  const todayStr     = new Date().toISOString().slice(0, 10);
+  const yesterdayStr = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })();
+  const sevenAgoStr  = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); })();
+
   // ── Render ────────────────────────────────────────────────────────────
   return (
     <div>
@@ -396,7 +482,11 @@ export default function OrdersPage() {
           <h1 style={{ fontSize: "22px", fontWeight: 800, marginBottom: "3px" }}>Orders</h1>
           <p style={{ color: "#6b7280", fontSize: "11px" }}>
             {stats ? `${stats.total.toLocaleString()} commandes` : "Toutes les commandes"}
-            {filterDate && ` — ${new Date(filterDate).toLocaleDateString("fr", { day: "2-digit", month: "long", year: "numeric" })}`}
+            {filterDate && (
+              filterDateTo && filterDateTo !== filterDate
+                ? ` — ${fmtLongDate(filterDate)} → ${fmtLongDate(filterDateTo)}`
+                : ` — ${fmtLongDate(filterDate)}`
+            )}
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
@@ -408,15 +498,15 @@ export default function OrdersPage() {
               padding: "8px 12px", borderRadius: "10px", fontSize: "11px", fontWeight: 600, cursor: "pointer",
             }}
           >
-            <Bell size={13} /> Reminders
-            {reminders.length > 0 && (
+            <Bell size={13} /> Rappels
+            {recallCount > 0 && (
               <span style={{
                 position: "absolute", top: -6, right: -6,
                 background: "#ef4444", color: "white",
                 fontSize: "9px", fontWeight: 700, borderRadius: "999px",
                 padding: "1px 5px", minWidth: "16px", textAlign: "center",
               }}>
-                {reminders.length}
+                {recallCount}
               </span>
             )}
           </button>
@@ -439,16 +529,20 @@ export default function OrdersPage() {
       {showStats && stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "10px", marginBottom: "14px" }}>
           {[
-            { label: "Total Orders", value: stats.total,                          icon: <ShoppingCart size={14}/>, bg: "#beecdf" },
-            { label: "Confirmed",    value: stats.confirmed,                       icon: <CheckCircle2 size={14}/>, bg: "#dcfce7" },
-            { label: "Pending",      value: stats.pending,                         icon: <Clock3       size={14}/>, bg: "#fef3c7" },
-            { label: "Revenue",      value: `${stats.revenue.toLocaleString()} MRU`, icon: <DollarSign  size={14}/>, bg: "#dbeafe" },
+            { label: "Total commandes",     value: stats.total,                              growth: stats.totalGrowth,             points: false, icon: <ShoppingCart size={14}/>, bg: "#beecdf" },
+            { label: "Revenu total",        value: `${stats.revenue.toLocaleString()} MRU`,  growth: stats.revenueGrowth,           points: false, icon: <DollarSign  size={14}/>, bg: "#dbeafe" },
+            { label: "Confirmées",          value: stats.confirmed,                          growth: stats.confirmedGrowth,         points: false, icon: <CheckCircle2 size={14}/>, bg: "#dcfce7" },
+            { label: "En attente",          value: stats.pending,                            growth: stats.pendingGrowth,           points: false, icon: <Clock3       size={14}/>, bg: "#fef3c7" },
+            { label: "Taux de confirmation", value: `${stats.confirmationRate}%`,            growth: stats.confirmationRateGrowth,  points: true,  icon: <CheckCircle2 size={14}/>, bg: "#ede9fe" },
+            { label: "Temps moyen de traitement", value: fmtMinutes(stats.avgProcessingTimeMin), growth: stats.avgProcessingGrowth, points: false, icon: <Clock3 size={14}/>, bg: "#fde68a" },
+            { label: "À rappeler",          value: stats.toRecall,                           growth: null as number | null,         points: false, icon: <Bell size={14}/>, bg: "#fee2e2" },
           ].map(s => (
             <div key={s.label} className="glass-card">
               <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <p style={{ fontSize: "10px", color: "#6b7280", marginBottom: "3px" }}>{s.label}</p>
                   <h2 style={{ fontSize: "17px", fontWeight: 800 }}>{s.value}</h2>
+                  <GrowthBadge value={s.growth} points={s.points} />
                 </div>
                 <div style={{
                   width: 34, height: 34, borderRadius: 10,
@@ -469,14 +563,14 @@ export default function OrdersPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <strong style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
                 <Bell size={12} color="#f59e0b" />
-                {reminders.length} orders need follow-up (pending &gt; 24h)
+                {recallCount} commande{recallCount > 1 ? "s" : ""} à rappeler
               </strong>
               <button onClick={() => setShowRemind(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}>
                 <X size={14} />
               </button>
             </div>
             {reminders.length === 0 ? (
-              <p style={{ fontSize: "11px", color: "#9ca3af" }}>All good — no overdue pending orders.</p>
+              <p style={{ fontSize: "11px", color: "#9ca3af" }}>Aucune commande à rappeler pour le moment.</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                 {reminders.slice(0, 6).map(o => (
@@ -491,7 +585,7 @@ export default function OrdersPage() {
                   </div>
                 ))}
                 {reminders.length > 6 && (
-                  <p style={{ fontSize: "10px", color: "#9ca3af", marginTop: 2 }}>+{reminders.length - 6} more…</p>
+                  <p style={{ fontSize: "10px", color: "#9ca3af", marginTop: 2 }}>+{reminders.length - 6} de plus…</p>
                 )}
               </div>
             )}
@@ -507,32 +601,26 @@ export default function OrdersPage() {
 
           {/* Quick buttons */}
           {[
-            { label: "Aujourd'hui", days: 0 },
-            { label: "Hier",        days: -1 },
-            { label: "7 jours",     days: -6 },
-          ].map(({ label, days }) => {
-            const d = new Date();
-            d.setDate(d.getDate() + days);
-            const val = d.toISOString().slice(0, 10);
-            const active = filterDate === val && days !== -6;
-            return (
-              <button
-                key={label}
-                onClick={() => handleDate(val)}
-                style={{
-                  height: 30, padding: "0 12px", borderRadius: 8, border: "1.5px solid",
-                  borderColor: active ? "#0d3938" : "#e5e7eb",
-                  background: active ? "#beecdf" : "white",
-                  color: active ? "#0d3938" : "#374151",
-                  fontSize: 11, fontWeight: active ? 700 : 500, cursor: "pointer",
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+            { label: "Aujourd'hui", active: filterDate === todayStr && !filterDateTo,                 onClick: () => handleDate(todayStr) },
+            { label: "Hier",        active: filterDate === yesterdayStr && !filterDateTo,             onClick: () => handleDate(yesterdayStr) },
+            { label: "7 jours",     active: filterDate === sevenAgoStr && filterDateTo === todayStr,  onClick: () => handleDateRange(sevenAgoStr, todayStr) },
+          ].map(({ label, active, onClick }) => (
+            <button
+              key={label}
+              onClick={onClick}
+              style={{
+                height: 30, padding: "0 12px", borderRadius: 8, border: "1.5px solid",
+                borderColor: active ? "#0d3938" : "#e5e7eb",
+                background: active ? "#beecdf" : "white",
+                color: active ? "#0d3938" : "#374151",
+                fontSize: 11, fontWeight: active ? 700 : 500, cursor: "pointer",
+              }}
+            >
+              {label}
+            </button>
+          ))}
 
-          {/* Custom date input */}
+          {/* Plage de dates personnalisée (du / au) */}
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <input
               type="date"
@@ -544,7 +632,22 @@ export default function OrdersPage() {
                 background: "white", cursor: "pointer", color: "#374151",
               }}
             />
-            {filterDate && (
+            <span style={{ fontSize: 11, color: "#9ca3af" }}>→</span>
+            <input
+              type="date"
+              value={filterDateTo}
+              min={filterDate || undefined}
+              onChange={e => handleDateTo(e.target.value)}
+              disabled={!filterDate}
+              title="Fin de la période (optionnel)"
+              style={{
+                height: 30, border: "1.5px solid #e5e7eb", borderRadius: 8,
+                padding: "0 8px", fontSize: 11, outline: "none",
+                background: filterDate ? "white" : "#f3f4f6",
+                cursor: filterDate ? "pointer" : "not-allowed", color: "#374151",
+              }}
+            />
+            {(filterDate || filterDateTo) && (
               <button
                 onClick={clearDate}
                 title="Voir toutes les dates"

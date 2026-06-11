@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  PackagePlus, Trash2, Edit2, Search,
+  PackagePlus, Trash2, Edit2, Pencil, Search,
   Package, ShoppingCart, Users, Shuffle, X, ChevronDown,
 } from "lucide-react";
 
@@ -12,7 +12,8 @@ interface Product {
   id: string; name: string; code: string; price: number;
   distributionType: string; createdAt: string;
   _count: { orders: number };
-  agents: { agent: Agent }[];
+  assignedAgentIds: string[];
+  hiddenForAgentIds: string[];
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ export default function ProductsPage() {
   const [showAdd,    setShowAdd]    = useState(false);
   const [editTarget, setEditTarget] = useState<Product | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
 
   // ── Fetch ─────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -43,7 +45,7 @@ export default function ProductsPage() {
 
   // ── Selection ─────────────────────────────────────────────────────────
   const toggleOne = (id: string) =>
-    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleAll = (list: Product[]) =>
     setSelected(prev => prev.size === list.length ? new Set() : new Set(list.map(p => p.id)));
 
@@ -74,6 +76,9 @@ export default function ProductsPage() {
 
   const totalOrders = products.reduce((s, p) => s + p._count.orders, 0);
   const specific    = products.filter(p => p.distributionType === "specific").length;
+
+  // IDs d'agents → agents (nom) pour l'affichage des badges
+  const agentsByIds = (ids: string[]) => agents.filter(a => ids.includes(a.id));
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
@@ -122,10 +127,16 @@ export default function ProductsPage() {
               style={{ width: "100%", paddingLeft: 30, paddingRight: 12, height: 34, border: "1px solid #e5e7eb", borderRadius: 9, fontSize: 11, outline: "none", background: "#f9fafb" }} />
           </div>
           {selected.size > 0 && (
-            <button onClick={() => setConfirmDel(true)}
-              style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "none", background: "#ef4444", color: "white", padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-              <Trash2 size={13} /> Delete ({selected.size})
-            </button>
+            <>
+              <button onClick={() => setShowBulkEdit(true)}
+                style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "1px solid #e5e7eb", background: "white", color: "#374151", padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                <Pencil size={13} /> Bulk Edit ({selected.size})
+              </button>
+              <button onClick={() => setConfirmDel(true)}
+                style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "none", background: "#ef4444", color: "white", padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                <Trash2 size={13} /> Delete ({selected.size})
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -136,7 +147,7 @@ export default function ProductsPage() {
           {loading ? (
             <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Loading…</div>
           ) : displayed.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>No products yet — click "Add Product"</div>
+            <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>No products yet — click &quot;Add Product&quot;</div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
               <thead>
@@ -144,7 +155,7 @@ export default function ProductsPage() {
                   <th style={{ padding: "11px 14px", width: 36 }}>
                     <input type="checkbox" checked={selected.size === displayed.length && displayed.length > 0} onChange={() => toggleAll(displayed)} style={{ cursor: "pointer" }} />
                   </th>
-                  {["Code", "Name", "Price", "Distribution", "Assigned Agents", "Orders", "Actions"].map(h => (
+                  {["Code", "Name", "Price", "Distribution", "Assigned Agents", "Hidden For", "Orders", "Actions"].map(h => (
                     <th key={h} style={{ padding: "11px 14px", fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -182,17 +193,32 @@ export default function ProductsPage() {
                     </td>
 
                     <td style={{ padding: "10px 14px" }}>
-                      {p.distributionType === "specific" && p.agents.length > 0 ? (
+                      {p.distributionType === "specific" && p.assignedAgentIds.length > 0 ? (
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                          {p.agents.slice(0, 3).map(a => (
-                            <span key={a.agent.id} style={{ background: "#beecdf", color: "#0d3938", padding: "2px 7px", borderRadius: 5, fontSize: 10, fontWeight: 600 }}>
-                              {a.agent.name}
+                          {agentsByIds(p.assignedAgentIds).slice(0, 3).map(a => (
+                            <span key={a.id} style={{ background: "#beecdf", color: "#0d3938", padding: "2px 7px", borderRadius: 5, fontSize: 10, fontWeight: 600 }}>
+                              {a.name}
                             </span>
                           ))}
-                          {p.agents.length > 3 && <span style={{ fontSize: 10, color: "#9ca3af" }}>+{p.agents.length - 3}</span>}
+                          {p.assignedAgentIds.length > 3 && <span style={{ fontSize: 10, color: "#9ca3af" }}>+{p.assignedAgentIds.length - 3}</span>}
                         </div>
                       ) : (
                         <span style={{ color: "#9ca3af", fontSize: 10 }}>All agents</span>
+                      )}
+                    </td>
+
+                    <td style={{ padding: "10px 14px" }}>
+                      {p.hiddenForAgentIds.length > 0 ? (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {agentsByIds(p.hiddenForAgentIds).slice(0, 3).map(a => (
+                            <span key={a.id} style={{ background: "#fee2e2", color: "#b91c1c", padding: "2px 7px", borderRadius: 5, fontSize: 10, fontWeight: 600 }}>
+                              {a.name}
+                            </span>
+                          ))}
+                          {p.hiddenForAgentIds.length > 3 && <span style={{ fontSize: 10, color: "#9ca3af" }}>+{p.hiddenForAgentIds.length - 3}</span>}
+                        </div>
+                      ) : (
+                        <span style={{ color: "#9ca3af", fontSize: 10 }}>—</span>
                       )}
                     </td>
 
@@ -214,6 +240,19 @@ export default function ProductsPage() {
 
       {showAdd    && <ProductModal agents={agents} onClose={() => setShowAdd(false)} onSaved={p => { setProducts(prev => [p, ...prev]); setShowAdd(false); }} />}
       {editTarget && <ProductModal product={editTarget} agents={agents} onClose={() => setEditTarget(null)} onSaved={u => { setProducts(prev => prev.map(p => p.id === u.id ? u : p)); setEditTarget(null); }} />}
+
+      {showBulkEdit && (
+        <BulkEditModal
+          ids={[...selected]}
+          agents={agents}
+          onClose={() => setShowBulkEdit(false)}
+          onSaved={updated => {
+            setProducts(prev => prev.map(p => updated.find(u => u.id === p.id) ?? p));
+            setSelected(new Set());
+            setShowBulkEdit(false);
+          }}
+        />
+      )}
 
       {confirmDel && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
@@ -241,6 +280,54 @@ export default function ProductsPage() {
   );
 }
 
+// ══ AGENT MULTI-SELECT (réutilisé : agents assignés / agents exclus) ══════════
+function AgentMultiSelect({ label, agents, selected, onToggle, placeholder = "Select agents…", tone = "teal" }: {
+  label?: string; agents: Agent[]; selected: Set<string>; onToggle: (id: string) => void;
+  placeholder?: string; tone?: "teal" | "red";
+}) {
+  const [open, setOpen] = useState(false);
+  const badgeBg    = tone === "red" ? "#fee2e2" : "#beecdf";
+  const badgeColor = tone === "red" ? "#b91c1c" : "#0d3938";
+
+  return (
+    <div>
+      {label && <label style={L}>{label}</label>}
+      <div style={{ position: "relative" }}>
+        <button type="button" onClick={() => setOpen(v => !v)}
+          style={{ ...I, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "white" }}>
+          <span style={{ color: selected.size ? "#111827" : "#9ca3af" }}>
+            {selected.size ? `${selected.size} agent(s) selected` : placeholder}
+          </span>
+          <ChevronDown size={13} />
+        </button>
+        {open && (
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "white", border: "1px solid #e5e7eb", borderRadius: 9, padding: 6, boxShadow: "0 8px 20px rgba(0,0,0,0.08)", maxHeight: 170, overflowY: "auto" }}>
+            {agents.length === 0
+              ? <p style={{ fontSize: 11, color: "#9ca3af", padding: 8 }}>No agents available</p>
+              : agents.map(a => (
+                <label key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, cursor: "pointer", background: selected.has(a.id) ? badgeBg : "transparent" }}>
+                  <input type="checkbox" checked={selected.has(a.id)} onChange={() => onToggle(a.id)} style={{ cursor: "pointer" }} />
+                  <span style={{ fontSize: 11, fontWeight: selected.has(a.id) ? 700 : 400 }}>{a.name}</span>
+                </label>
+              ))
+            }
+          </div>
+        )}
+      </div>
+      {selected.size > 0 && (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+          {agents.filter(a => selected.has(a.id)).map(a => (
+            <span key={a.id} style={{ background: badgeBg, color: badgeColor, padding: "2px 8px", borderRadius: 5, fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+              {a.name}
+              <button type="button" onClick={() => onToggle(a.id)} style={{ background: "none", border: "none", cursor: "pointer", color: badgeColor, padding: 0, display: "flex" }}><X size={9}/></button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ══ PRODUCT MODAL ══════════════════════════════════════════════════════════
 function ProductModal({ product, agents, onClose, onSaved }: {
   product?: Product; agents: Agent[]; onClose: () => void; onSaved: (p: Product) => void;
@@ -248,19 +335,25 @@ function ProductModal({ product, agents, onClose, onSaved }: {
   const [name,    setName]    = useState(product?.name  ?? "");
   const [price,   setPrice]   = useState(product?.price ?? 0);
   const [distrib, setDistrib] = useState(product?.distributionType ?? "random");
-  const [selAgents, setSelAgents] = useState<Set<string>>(new Set(product?.agents.map(a => a.agent.id) ?? []));
+  const [selAgents, setSelAgents] = useState<Set<string>>(new Set(product?.assignedAgentIds ?? []));
+  const [selHidden, setSelHidden] = useState<Set<string>>(new Set(product?.hiddenForAgentIds ?? []));
   const [error,   setError]   = useState("");
   const [saving,  setSaving]  = useState(false);
-  const [agentOpen, setAgentOpen] = useState(false);
 
-  const toggleAgent = (id: string) =>
-    setSelAgents(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAgent  = (id: string) =>
+    setSelAgents(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const toggleHidden = (id: string) =>
+    setSelHidden(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError("Product name is required"); return; }
     setSaving(true); setError("");
-    const body = { name: name.trim(), price: Number(price), distributionType: distrib, agentIds: distrib === "specific" ? [...selAgents] : [] };
+    const body = {
+      name: name.trim(), price: Number(price), distributionType: distrib,
+      agentIds: distrib === "specific" ? [...selAgents] : [],
+      hiddenAgentIds: [...selHidden],
+    };
     const url    = product ? `/api/products/${product.id}` : "/api/products";
     const method = product ? "PATCH" : "POST";
     const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -272,7 +365,7 @@ function ProductModal({ product, agents, onClose, onSaved }: {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div className="glass-card" style={{ padding: 24, width: 360 }}>
+      <div className="glass-card" style={{ padding: 24, width: 360, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <strong style={{ fontSize: 14 }}>{product ? "Edit Product" : "Add Product"}</strong>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}><X size={16} /></button>
@@ -320,45 +413,143 @@ function ProductModal({ product, agents, onClose, onSaved }: {
           </div>
 
           {distrib === "specific" && (
-            <div>
-              <label style={L}>Assigned Agents</label>
-              <div style={{ position: "relative" }}>
-                <button type="button" onClick={() => setAgentOpen(v => !v)}
-                  style={{ ...I, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "white" }}>
-                  <span style={{ color: selAgents.size ? "#111827" : "#9ca3af" }}>
-                    {selAgents.size ? `${selAgents.size} agent(s) selected` : "Select agents…"}
-                  </span>
-                  <ChevronDown size={13} />
-                </button>
-                {agentOpen && (
-                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "white", border: "1px solid #e5e7eb", borderRadius: 9, padding: 6, boxShadow: "0 8px 20px rgba(0,0,0,0.08)", maxHeight: 170, overflowY: "auto" }}>
-                    {agents.length === 0
-                      ? <p style={{ fontSize: 11, color: "#9ca3af", padding: 8 }}>No agents available</p>
-                      : agents.map(a => (
-                        <label key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, cursor: "pointer", background: selAgents.has(a.id) ? "#beecdf" : "transparent" }}>
-                          <input type="checkbox" checked={selAgents.has(a.id)} onChange={() => toggleAgent(a.id)} style={{ cursor: "pointer" }} />
-                          <span style={{ fontSize: 11, fontWeight: selAgents.has(a.id) ? 700 : 400 }}>{a.name}</span>
-                        </label>
-                      ))
-                    }
-                  </div>
-                )}
-              </div>
-              {selAgents.size > 0 && (
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                  {agents.filter(a => selAgents.has(a.id)).map(a => (
-                    <span key={a.id} style={{ background: "#beecdf", color: "#0d3938", padding: "2px 8px", borderRadius: 5, fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                      {a.name}
-                      <button type="button" onClick={() => toggleAgent(a.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#0d3938", padding: 0, display: "flex" }}><X size={9}/></button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+            <AgentMultiSelect
+              label="Assigned Agents"
+              agents={agents}
+              selected={selAgents}
+              onToggle={toggleAgent}
+              placeholder="Select agents…"
+            />
           )}
+
+          <AgentMultiSelect
+            label="Hidden For (excluded agents)"
+            agents={agents}
+            selected={selHidden}
+            onToggle={toggleHidden}
+            placeholder="No agent excluded"
+            tone="red"
+          />
 
           {error && <p style={{ fontSize: 11, color: "#ef4444" }}>{error}</p>}
           <button type="submit" disabled={saving} style={S}>{saving ? "Saving…" : product ? "Save Changes" : "Add Product"}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ══ BULK EDIT MODAL (Actions groupées) ════════════════════════════════════
+function BulkEditModal({ ids, agents, onClose, onSaved }: {
+  ids: string[]; agents: Agent[]; onClose: () => void; onSaved: (products: Product[]) => void;
+}) {
+  const [editPrice,   setEditPrice]   = useState(false);
+  const [price,       setPrice]       = useState(0);
+  const [editDistrib, setEditDistrib] = useState(false);
+  const [distrib,     setDistrib]     = useState("random");
+  const [editAgents,  setEditAgents]  = useState(false);
+  const [selAgents,   setSelAgents]   = useState<Set<string>>(new Set());
+  const [editHidden,  setEditHidden]  = useState(false);
+  const [selHidden,   setSelHidden]   = useState<Set<string>>(new Set());
+  const [error,  setError]  = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const toggleAgent  = (id: string) =>
+    setSelAgents(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const toggleHidden = (id: string) =>
+    setSelHidden(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editPrice && !editDistrib && !editAgents && !editHidden) {
+      setError("Select at least one field to update");
+      return;
+    }
+    setSaving(true); setError("");
+    const body: Record<string, unknown> = { ids };
+    if (editPrice)   body.price = Number(price);
+    if (editDistrib) body.distributionType = distrib;
+    if (editAgents)  body.agentIds = [...selAgents];
+    if (editHidden)  body.hiddenAgentIds = [...selHidden];
+
+    const res  = await fetch("/api/products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) { setError(data.error || "Error"); return; }
+    onSaved(data.products ?? []);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div className="glass-card" style={{ padding: 24, width: 380, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <strong style={{ fontSize: 14 }}>Bulk Edit</strong>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}><X size={16} /></button>
+        </div>
+        <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 14 }}>
+          Applies to <strong>{ids.length}</strong> selected product{ids.length > 1 ? "s" : ""}. Only checked fields below will be changed.
+        </p>
+
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: editPrice ? 8 : 0 }}>
+              <input type="checkbox" checked={editPrice} onChange={e => setEditPrice(e.target.checked)} />
+              Price (MRU)
+            </label>
+            {editPrice && (
+              <input type="number" min="0" value={price} onChange={e => setPrice(Number(e.target.value))} placeholder="0" style={I} />
+            )}
+          </div>
+
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: editDistrib ? 8 : 0 }}>
+              <input type="checkbox" checked={editDistrib} onChange={e => setEditDistrib(e.target.checked)} />
+              Distribution Type
+            </label>
+            {editDistrib && (
+              <div style={{ display: "flex", gap: 6 }}>
+                {[
+                  { val: "random",   label: "🔀 Random" },
+                  { val: "specific", label: "👥 Specific" },
+                ].map(opt => (
+                  <button key={opt.val} type="button" onClick={() => setDistrib(opt.val)}
+                    style={{
+                      flex: 1, padding: "8px 10px", border: "2px solid", borderRadius: 9,
+                      borderColor: distrib === opt.val ? "#0d3938" : "#e5e7eb",
+                      background:  distrib === opt.val ? "#beecdf" : "white",
+                      fontSize: 11, fontWeight: 700, cursor: "pointer",
+                      color: distrib === opt.val ? "#4f46e5" : "#374151",
+                    }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: editAgents ? 8 : 0 }}>
+              <input type="checkbox" checked={editAgents} onChange={e => setEditAgents(e.target.checked)} />
+              Assigned Agents
+            </label>
+            {editAgents && (
+              <AgentMultiSelect agents={agents} selected={selAgents} onToggle={toggleAgent} placeholder="Select agents…" />
+            )}
+          </div>
+
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: editHidden ? 8 : 0 }}>
+              <input type="checkbox" checked={editHidden} onChange={e => setEditHidden(e.target.checked)} />
+              Hidden For (excluded agents)
+            </label>
+            {editHidden && (
+              <AgentMultiSelect agents={agents} selected={selHidden} onToggle={toggleHidden} placeholder="No agent excluded" tone="red" />
+            )}
+          </div>
+
+          {error && <p style={{ fontSize: 11, color: "#ef4444" }}>{error}</p>}
+          <button type="submit" disabled={saving} style={S}>{saving ? "Saving…" : `Apply to ${ids.length} product${ids.length > 1 ? "s" : ""}`}</button>
         </form>
       </div>
     </div>
