@@ -48,7 +48,9 @@ const COLS = [
 ];
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("fr", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr", { day: "2-digit", month: "2-digit", year: "2-digit" })
+    + " " + d.toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" });
 }
 
 // Temps de traitement (minutes) → "8 min" / "2h15"
@@ -135,8 +137,6 @@ export default function OrdersPage() {
   const [visibleCols,  setVisibleCols]  = useState<Set<string>>(new Set(COLS.map(c => c.key)));
 
   const [confirmDel,   setConfirmDel]   = useState(false);
-  const [reassignId,   setReassignId]   = useState<string | null>(null);
-  const [statusTarget, setStatusTarget] = useState<string | null>(null);
   const [editTarget,   setEditTarget]   = useState<Order | null>(null);
 
   const sentinel  = useRef<HTMLDivElement>(null);
@@ -278,9 +278,15 @@ export default function OrdersPage() {
     });
     if (res.ok) {
       const updated = await res.json();
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: updated.status } : o));
+      // Le changement de statut peut recalculer le temps de traitement / le rappel
+      setOrders(prev => prev.map(o => o.id === orderId ? {
+        ...o,
+        status:            updated.status            ?? o.status,
+        processingTimeMin: updated.processingTimeMin ?? o.processingTimeMin,
+        absoluteDelayMin:  updated.absoluteDelayMin  ?? o.absoluteDelayMin,
+        recallAt:          updated.recallAt          ?? o.recallAt,
+      } : o));
     }
-    setStatusTarget(null);
   };
 
   // ── Reassign agent ────────────────────────────────────────────────────
@@ -294,7 +300,6 @@ export default function OrdersPage() {
       const updated = await res.json();
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, agent: updated.agent } : o));
     }
-    setReassignId(null);
   };
 
   // ── Sauvegarde notes / tentatives / rappel (modale d'édition) ─────────
@@ -347,7 +352,15 @@ export default function OrdersPage() {
   const recallCount = stats?.toRecall ?? reminders.length;
 
   // ── Filtre rapide par carte de stat (cliquer "À rappeler" → liste filtrée) ──
-  const displayedOrders = cardFilter === "recall" ? reminders : orders;
+  // + tri : les commandes à rappeler (recall dépassé) remontent en haut (comme l'ancien app)
+  const displayedOrders = (cardFilter === "recall" ? reminders : orders)
+    .slice()
+    .sort((a, b) => {
+      const now = Date.now();
+      const aDue = a.recallAt && new Date(a.recallAt).getTime() < now ? 0 : 1;
+      const bDue = b.recallAt && new Date(b.recallAt).getTime() < now ? 0 : 1;
+      return aDue - bDue;
+    });
 
   // ── Modification groupée : applique statut et/ou agent aux commandes cochées ──
   const handleBulkEdit = async (patch: { statusId?: string; agentId?: string }) => {
@@ -382,23 +395,24 @@ export default function OrdersPage() {
       case "revenue":  return <strong style={{ color: "#16a34a" }}>{o.revenue.toLocaleString()} MRU</strong>;
       case "agent":
         if (isAgent) {
-          return <span style={{ fontSize: 11, color: "#6b7280" }}>{o.agent?.name ?? "—"}</span>;
+          return <span style={{ fontSize: 10, color: "#6b7280" }}>{o.agent?.name ?? "—"}</span>;
         }
+        // Menu déroulant inline (comme l'ancien app) : réassigne l'agent directement.
         return (
-          <button
-            onClick={() => setReassignId(o.id)}
+          <select
+            value={o.agent?.id ?? ""}
+            onChange={e => handleReassign(o.id, e.target.value)}
+            onClick={e => e.stopPropagation()}
+            title="Réassigner l'agent"
             style={{
-              display: "inline-flex", alignItems: "center", gap: "4px",
-              background: "none", border: "1px solid #e5e7eb", borderRadius: "8px",
-              padding: "3px 9px", fontSize: "10px", cursor: "pointer",
-              color: o.agent ? "#111827" : "#9ca3af", fontWeight: 600,
+              border: "1px solid #e5e7eb", borderRadius: 8, background: "white",
+              padding: "3px 6px", fontSize: 10, fontWeight: 600, cursor: "pointer",
+              maxWidth: 118, outline: "none", color: o.agent ? "#111827" : "#9ca3af",
             }}
           >
-            {o.agent?.iconColor && (
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: o.agent.iconColor, display: "inline-block", flexShrink: 0 }} />
-            )}
-            {o.agent?.name ?? "Unassigned"} <ChevronDown size={10} />
-          </button>
+            <option value="">— Non assigné —</option>
+            {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
         );
       case "attempts":
         return (
@@ -469,24 +483,26 @@ export default function OrdersPage() {
           </button>
         );
       case "status": {
-        const raw = o.status.color || "#6b7280";
+        const raw = o.status?.color || "#6b7280";
         const isHex = raw.startsWith("#");
         const bg   = isHex ? raw + "22" : "#f3f4f6";
         const fg   = isHex ? raw        : "#374151";
+        // Menu déroulant inline (comme l'ancien app) : change le statut directement.
         return (
-          <button
-            onClick={() => setStatusTarget(o.id)}
-            title="Click to change status"
+          <select
+            value={o.status?.id ?? ""}
+            onChange={e => handleStatusChange(o.id, e.target.value)}
+            onClick={e => e.stopPropagation()}
+            title="Changer le statut"
             style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              background: bg, color: fg,
-              padding: "3px 9px", borderRadius: "999px",
-              fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap",
-              border: "none", cursor: "pointer",
+              background: bg, color: fg, border: "none", borderRadius: 999,
+              padding: "3px 7px", fontSize: 10, fontWeight: 700, cursor: "pointer",
+              maxWidth: 128, outline: "none",
             }}
           >
-            {o.status.name} <ChevronDown size={9} />
-          </button>
+            {!o.status && <option value="">—</option>}
+            {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
         );
       }
       default: return "—";
@@ -553,37 +569,37 @@ export default function OrdersPage() {
 
       {/* ── QUICK STATS (cartes colorées cliquables, comme l'ancien app — nos teintes) ── */}
       {showStats && stats && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
 
           {/* Carte "À rappeler" — pleine largeur, cliquable pour filtrer */}
           <button
             onClick={() => setCardFilter(f => f === "recall" ? null : "recall")}
             style={{
               textAlign: "left", border: "none", cursor: "pointer", width: "100%",
-              background: "#fee2e2", borderRadius: 16, padding: "14px 18px",
+              background: "#fee2e2", borderRadius: 14, padding: "10px 14px",
               display: "flex", justifyContent: "space-between", alignItems: "center",
               boxShadow: cardFilter === "recall" ? "0 0 0 2px #ef4444" : "none",
               transition: "box-shadow .15s",
             }}
           >
             <div>
-              <p style={{ fontSize: 10, fontWeight: 800, color: "#991b1b", textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.85 }}>
+              <p style={{ fontSize: 9, fontWeight: 800, color: "#991b1b", textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.85 }}>
                 À rappeler {cardFilter === "recall" && "· filtre actif"}
               </p>
-              <h2 style={{ fontSize: 26, fontWeight: 800, color: "#7f1d1d", lineHeight: 1.1, marginTop: 3 }}>{stats.toRecall}</h2>
+              <h2 style={{ fontSize: 21, fontWeight: 800, color: "#7f1d1d", lineHeight: 1.1, marginTop: 2 }}>{stats.toRecall}</h2>
             </div>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: "#fecaca", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Bell size={19} color="#b91c1c" />
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: "#fecaca", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Bell size={16} color="#b91c1c" />
             </div>
           </button>
 
           {/* 4 KPI colorés (Total cliquable, les autres en lecture) */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
             {[
-              { key: "all"  as const, label: "Total commandes",            value: stats.total,                            growth: stats.totalGrowth,            points: false, icon: <ShoppingCart size={18}/>, bg: "#beecdf", fg: "#0d3938", iconBg: "#9fe1cb", clickable: true  },
-              { key: null,            label: "Revenu total",               value: `${stats.revenue.toLocaleString()} MRU`, growth: stats.revenueGrowth,          points: false, icon: <DollarSign  size={18}/>,  bg: "#dcfce7", fg: "#14532d", iconBg: "#bbf7d0", clickable: false },
-              { key: null,            label: "Taux de confirmation",       value: `${stats.confirmationRate}%`,           growth: stats.confirmationRateGrowth, points: true,  icon: <CheckCircle2 size={18}/>, bg: "#fef3c7", fg: "#854d0e", iconBg: "#fde68a", clickable: false },
-              { key: null,            label: "Temps moyen de traitement",  value: fmtMinutes(stats.avgProcessingTimeMin), growth: stats.avgProcessingGrowth,    points: false, icon: <Clock3      size={18}/>,  bg: "#dbeafe", fg: "#1e3a8a", iconBg: "#bfdbfe", clickable: false },
+              { key: "all"  as const, label: "Total commandes",            value: stats.total,                            growth: stats.totalGrowth,            points: false, icon: <ShoppingCart size={15}/>, bg: "#beecdf", fg: "#0d3938", iconBg: "#9fe1cb", clickable: true  },
+              { key: null,            label: "Revenu total",               value: `${stats.revenue.toLocaleString()} MRU`, growth: stats.revenueGrowth,          points: false, icon: <DollarSign  size={15}/>,  bg: "#dcfce7", fg: "#14532d", iconBg: "#bbf7d0", clickable: false },
+              { key: null,            label: "Taux de confirmation",       value: `${stats.confirmationRate}%`,           growth: stats.confirmationRateGrowth, points: true,  icon: <CheckCircle2 size={15}/>, bg: "#fef3c7", fg: "#854d0e", iconBg: "#fde68a", clickable: false },
+              { key: null,            label: "Temps moyen de traitement",  value: fmtMinutes(stats.avgProcessingTimeMin), growth: stats.avgProcessingGrowth,    points: false, icon: <Clock3      size={15}/>,  bg: "#dbeafe", fg: "#1e3a8a", iconBg: "#bfdbfe", clickable: false },
             ].map((c, idx) => (
               <button
                 key={idx}
@@ -591,18 +607,18 @@ export default function OrdersPage() {
                 disabled={!c.clickable}
                 style={{
                   textAlign: "left", border: "none", cursor: c.clickable ? "pointer" : "default",
-                  background: c.bg, borderRadius: 16, padding: "13px 15px",
-                  display: "flex", flexDirection: "column", gap: 8, minHeight: 86,
+                  background: c.bg, borderRadius: 14, padding: "10px 12px",
+                  display: "flex", flexDirection: "column", gap: 6, minHeight: 70,
                   boxShadow: c.clickable && cardFilter === c.key ? `0 0 0 2px ${c.fg}` : "none",
                   transition: "box-shadow .15s",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
-                  <p style={{ fontSize: 10, fontWeight: 800, color: c.fg, textTransform: "uppercase", letterSpacing: "0.03em", opacity: 0.85, lineHeight: 1.3 }}>{c.label}</p>
-                  <div style={{ width: 34, height: 34, borderRadius: 10, background: c.iconBg, color: c.fg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.icon}</div>
+                  <p style={{ fontSize: 9, fontWeight: 800, color: c.fg, textTransform: "uppercase", letterSpacing: "0.03em", opacity: 0.85, lineHeight: 1.3 }}>{c.label}</p>
+                  <div style={{ width: 28, height: 28, borderRadius: 9, background: c.iconBg, color: c.fg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.icon}</div>
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, color: c.fg, lineHeight: 1 }}>{c.value}</h2>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                  <h2 style={{ fontSize: 19, fontWeight: 800, color: c.fg, lineHeight: 1 }}>{c.value}</h2>
                   <GrowthBadge value={c.growth} points={c.points} />
                 </div>
               </button>
@@ -854,7 +870,7 @@ export default function OrdersPage() {
                 <thead>
                   <tr style={{ borderBottom: "2px solid #f3f4f6", textAlign: "left" }}>
                     {!isAgent && (
-                      <th style={{ padding: "11px 14px", width: 36 }}>
+                      <th style={{ padding: "8px 12px", width: 34 }}>
                         <input
                           type="checkbox"
                           checked={selected.size > 0 && selected.size === orders.length}
@@ -864,18 +880,21 @@ export default function OrdersPage() {
                       </th>
                     )}
                     {visible.map(col => (
-                      <th key={col.key} style={{ padding: "11px 14px", fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
+                      <th key={col.key} style={{ padding: "8px 12px", fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.02em" }}>
                         {col.label}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedOrders.map((order, i) => (
+                  {displayedOrders.map((order, i) => {
+                    const overdue = !!(order.recallAt && new Date(order.recallAt).getTime() < Date.now());
+                    return (
                     <tr
                       key={order.id}
                       style={{
                         borderBottom: "1px solid #f9fafb",
+                        borderLeft: overdue ? "3px solid #ef4444" : "3px solid transparent",
                         background: selected.has(order.id) ? "#f0f7f4" : "transparent",
                         cursor: "default",
                       }}
@@ -889,7 +908,7 @@ export default function OrdersPage() {
                       }}
                     >
                       {!isAgent && (
-                        <td style={{ padding: "9px 14px" }}>
+                        <td style={{ padding: "7px 12px" }}>
                           <input
                             type="checkbox"
                             checked={selected.has(order.id)}
@@ -899,12 +918,13 @@ export default function OrdersPage() {
                         </td>
                       )}
                       {visible.map(col => (
-                        <td key={col.key} style={{ padding: "9px 14px", whiteSpace: "nowrap" }}>
+                        <td key={col.key} style={{ padding: "7px 12px", whiteSpace: "nowrap" }}>
                           {cell(col.key, order, i)}
                         </td>
                       ))}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1051,96 +1071,6 @@ export default function OrdersPage() {
               >
                 Delete
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── CHANGE STATUS MODAL ── */}
-      {statusTarget && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-        }}>
-          <div className="glass-card" style={{ padding: 20, width: 260 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <strong style={{ fontSize: 13 }}>Change Status</strong>
-              <button onClick={() => setStatusTarget(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}>
-                <X size={14} />
-              </button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {statuses.map(s => {
-                const isHex = s.color?.startsWith("#");
-                const bg = isHex ? s.color + "22" : "#f3f4f6";
-                const fg = isHex ? s.color        : "#374151";
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => handleStatusChange(statusTarget, s.id)}
-                    style={{
-                      padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 9,
-                      fontSize: 11, cursor: "pointer", background: "white", textAlign: "left",
-                      display: "flex", alignItems: "center", gap: 8,
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "white")}
-                  >
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: bg, border: `2px solid ${fg}`, display: "inline-block", flexShrink: 0 }} />
-                    <span style={{ fontWeight: 600, color: fg }}>{s.name}</span>
-                  </button>
-                );
-              })}
-              {statuses.length === 0 && (
-                <p style={{ fontSize: 11, color: "#9ca3af" }}>No statuses configured yet</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── REASSIGN AGENT MODAL ── */}
-      {reassignId && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-        }}>
-          <div className="glass-card" style={{ padding: 20, width: 260 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <strong style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                <UserCheck size={14} /> Reassign Agent
-              </strong>
-              <button onClick={() => setReassignId(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}>
-                <X size={14} />
-              </button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <button
-                onClick={() => handleReassign(reassignId, "")}
-                style={{
-                  padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 9,
-                  fontSize: 11, cursor: "pointer", background: "white", textAlign: "left", color: "#9ca3af",
-                }}
-              >
-                Unassigned
-              </button>
-              {agents.length === 0 && (
-                <p style={{ fontSize: 11, color: "#9ca3af", padding: "4px 0" }}>No agents available</p>
-              )}
-              {agents.map(a => (
-                <button
-                  key={a.id}
-                  onClick={() => handleReassign(reassignId, a.id)}
-                  style={{
-                    padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 9,
-                    fontSize: 11, cursor: "pointer", background: "white", textAlign: "left", fontWeight: 600,
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#f0f7f4")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "white")}
-                >
-                  {a.name}
-                </button>
-              ))}
             </div>
           </div>
         </div>
