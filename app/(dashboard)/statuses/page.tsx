@@ -108,15 +108,15 @@ export default function StatusesPage() {
   const inactive = statuses.filter(s => !s.isActive);
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 800, margin: "0 auto" }}>
+    <div style={{ maxWidth: 820, margin: "0 auto" }}>
 
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 10, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", margin: 0 }}>
-            Gestion des Statuts
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>
+            Gestion des statuts
           </h1>
-          <p style={{ fontSize: 12, color: "#9ca3af", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 11, color: "#9ca3af", margin: "3px 0 0" }}>
             {active.length} statut{active.length !== 1 ? "s" : ""} actif{active.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -134,20 +134,20 @@ export default function StatusesPage() {
       </div>
 
       {/* Quick stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8, marginBottom: 14 }}>
         {[
-          { label: "Total statuts",  value: statuses.length,                                      icon: <ListChecks  size={14}/>, bg: "#beecdf" },
-          { label: "Actifs",         value: active.length,                                        icon: <CheckCircle2 size={14}/>, bg: "#dcfce7" },
-          { label: "Avec alerte",    value: statuses.filter(s => s.alertAfterHours).length,       icon: <Bell        size={14}/>, bg: "#fef3c7" },
-          { label: "Statuts finaux", value: statuses.filter(s => s.isFinal).length,                icon: <Flag        size={14}/>, bg: "#dbeafe" },
+          { label: "Total statuts",  value: statuses.length,                                      icon: <ListChecks  size={13}/>, bg: "#beecdf" },
+          { label: "Actifs",         value: active.length,                                        icon: <CheckCircle2 size={13}/>, bg: "#dcfce7" },
+          { label: "Avec alerte",    value: statuses.filter(s => s.alertAfterHours).length,       icon: <Bell        size={13}/>, bg: "#fef3c7" },
+          { label: "Statuts finaux", value: statuses.filter(s => s.isFinal).length,                icon: <Flag        size={13}/>, bg: "#dbeafe" },
         ].map(s => (
           <div key={s.label} className="glass-card">
-            <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <p style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>{s.label}</p>
-                <h2 style={{ fontSize: 18, fontWeight: 800 }}>{s.value}</h2>
+                <p style={{ fontSize: 9, color: "#6b7280", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: 700 }}>{s.label}</p>
+                <h2 style={{ fontSize: 16, fontWeight: 800 }}>{s.value}</h2>
               </div>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
+              <div style={{ width: 28, height: 28, borderRadius: 9, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
             </div>
           </div>
         ))}
@@ -399,12 +399,12 @@ function StatusRow({
 }) {
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 12,
-      background: "white", borderRadius: 12, padding: "13px 16px",
+      display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      background: "white", borderRadius: 12, padding: "11px 14px",
       border: "1px solid #edf0f5", boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
     }}>
       {/* Color dot */}
-      <div style={{ width: 12, height: 12, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+      <div style={{ width: 11, height: 11, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
 
       {/* Badge preview */}
       <span style={{
@@ -435,39 +435,38 @@ function StatusRow({
         </span>
       )}
 
-      <div style={{ flex: 1 }} />
+      {/* isActive badge + actions (poussés à droite, s'enroulent sur mobile) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+        <span style={{
+          fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 20, textTransform: "uppercase",
+          background: s.isActive ? "#dcfce7" : "#f3f4f6",
+          color: s.isActive ? "#16a34a" : "#9ca3af",
+        }}>
+          {s.isActive ? "Actif" : "Inactif"}
+        </span>
 
-      {/* isActive badge */}
-      <span style={{
-        fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 20, textTransform: "uppercase",
-        background: s.isActive ? "#dcfce7" : "#f3f4f6",
-        color: s.isActive ? "#16a34a" : "#9ca3af",
-      }}>
-        {s.isActive ? "Actif" : "Inactif"}
-      </span>
-
-      {/* Actions */}
-      <button
-        onClick={() => onEdit(s)}
-        title="Modifier"
-        style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 4 }}
-      >
-        <Pencil size={13} />
-      </button>
-      <button
-        onClick={() => onToggle(s)}
-        title={s.isActive ? "Désactiver" : "Réactiver"}
-        style={{ background: "none", border: "none", cursor: "pointer", color: s.isActive ? "#f59e0b" : "#22c55e", padding: 4 }}
-      >
-        <Power size={13} />
-      </button>
-      <button
-        onClick={() => onDelete(s.id)}
-        title="Supprimer définitivement"
-        style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 4 }}
-      >
-        <Trash2 size={13} />
-      </button>
+        <button
+          onClick={() => onEdit(s)}
+          title="Modifier"
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 4 }}
+        >
+          <Pencil size={13} />
+        </button>
+        <button
+          onClick={() => onToggle(s)}
+          title={s.isActive ? "Désactiver" : "Réactiver"}
+          style={{ background: "none", border: "none", cursor: "pointer", color: s.isActive ? "#f59e0b" : "#22c55e", padding: 4 }}
+        >
+          <Power size={13} />
+        </button>
+        <button
+          onClick={() => onDelete(s.id)}
+          title="Supprimer définitivement"
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 4 }}
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
     </div>
   );
 }
