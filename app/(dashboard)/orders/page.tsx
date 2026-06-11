@@ -5,7 +5,7 @@ import {
   Search, Trash2, UserCheck, Bell, BarChart2,
   SlidersHorizontal, ChevronDown, X, Calendar,
   ShoppingCart, CheckCircle2, Clock3, DollarSign, PhoneCall,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Pencil,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -127,6 +127,8 @@ export default function OrdersPage() {
 
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [expanded,     setExpanded]     = useState<Set<string>>(new Set()); // cartes dépliées (mobile)
+  const [cardFilter,   setCardFilter]   = useState<"all" | "recall" | null>(null); // carte de stat cliquée (filtre rapide)
+  const [bulkEdit,     setBulkEdit]     = useState(false); // modale "Modifier en groupe"
   const [showStats,    setShowStats]    = useState(true);
   const [showRemind,   setShowRemind]   = useState(false);
   const [showColMenu,  setShowColMenu]  = useState(false);
@@ -344,6 +346,25 @@ export default function OrdersPage() {
   // Compteur global "à rappeler" (toutes pages confondues, via l'API)
   const recallCount = stats?.toRecall ?? reminders.length;
 
+  // ── Filtre rapide par carte de stat (cliquer "À rappeler" → liste filtrée) ──
+  const displayedOrders = cardFilter === "recall" ? reminders : orders;
+
+  // ── Modification groupée : applique statut et/ou agent aux commandes cochées ──
+  const handleBulkEdit = async (patch: { statusId?: string; agentId?: string }) => {
+    const ids = [...selected];
+    await Promise.all(ids.map(id =>
+      fetch(`/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      })
+    ));
+    // Recharge la liste pour refléter les changements
+    setSelected(new Set());
+    setBulkEdit(false);
+    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo });
+  };
+
   // ── Visible columns ───────────────────────────────────────────────────
   const visible = COLS.filter(c => visibleCols.has(c.key));
 
@@ -530,34 +551,63 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* ── QUICK STATS ── */}
+      {/* ── QUICK STATS (cartes colorées cliquables, comme l'ancien app — nos teintes) ── */}
       {showStats && stats && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: "10px", marginBottom: "14px" }}>
-          {[
-            { label: "Total commandes",     value: stats.total,                              growth: stats.totalGrowth,             points: false, icon: <ShoppingCart size={14}/>, bg: "#beecdf" },
-            { label: "Revenu total",        value: `${stats.revenue.toLocaleString()} MRU`,  growth: stats.revenueGrowth,           points: false, icon: <DollarSign  size={14}/>, bg: "#dbeafe" },
-            { label: "Confirmées",          value: stats.confirmed,                          growth: stats.confirmedGrowth,         points: false, icon: <CheckCircle2 size={14}/>, bg: "#dcfce7" },
-            { label: "En attente",          value: stats.pending,                            growth: stats.pendingGrowth,           points: false, icon: <Clock3       size={14}/>, bg: "#fef3c7" },
-            { label: "Taux de confirmation", value: `${stats.confirmationRate}%`,            growth: stats.confirmationRateGrowth,  points: true,  icon: <CheckCircle2 size={14}/>, bg: "#ede9fe" },
-            { label: "Temps moyen de traitement", value: fmtMinutes(stats.avgProcessingTimeMin), growth: stats.avgProcessingGrowth, points: false, icon: <Clock3 size={14}/>, bg: "#fde68a" },
-            { label: "À rappeler",          value: stats.toRecall,                           growth: null as number | null,         points: false, icon: <Bell size={14}/>, bg: "#fee2e2" },
-          ].map(s => (
-            <div key={s.label} className="glass-card">
-              <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <p style={{ fontSize: "10px", color: "#6b7280", marginBottom: "3px" }}>{s.label}</p>
-                  <h2 style={{ fontSize: "17px", fontWeight: 800 }}>{s.value}</h2>
-                  <GrowthBadge value={s.growth} points={s.points} />
-                </div>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 10,
-                  background: s.bg, display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  {s.icon}
-                </div>
-              </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+
+          {/* Carte "À rappeler" — pleine largeur, cliquable pour filtrer */}
+          <button
+            onClick={() => setCardFilter(f => f === "recall" ? null : "recall")}
+            style={{
+              textAlign: "left", border: "none", cursor: "pointer", width: "100%",
+              background: "#fee2e2", borderRadius: 16, padding: "14px 18px",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              boxShadow: cardFilter === "recall" ? "0 0 0 2px #ef4444" : "none",
+              transition: "box-shadow .15s",
+            }}
+          >
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 800, color: "#991b1b", textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.85 }}>
+                À rappeler {cardFilter === "recall" && "· filtre actif"}
+              </p>
+              <h2 style={{ fontSize: 26, fontWeight: 800, color: "#7f1d1d", lineHeight: 1.1, marginTop: 3 }}>{stats.toRecall}</h2>
             </div>
-          ))}
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: "#fecaca", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Bell size={19} color="#b91c1c" />
+            </div>
+          </button>
+
+          {/* 4 KPI colorés (Total cliquable, les autres en lecture) */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
+            {[
+              { key: "all"  as const, label: "Total commandes",            value: stats.total,                            growth: stats.totalGrowth,            points: false, icon: <ShoppingCart size={18}/>, bg: "#beecdf", fg: "#0d3938", iconBg: "#9fe1cb", clickable: true  },
+              { key: null,            label: "Revenu total",               value: `${stats.revenue.toLocaleString()} MRU`, growth: stats.revenueGrowth,          points: false, icon: <DollarSign  size={18}/>,  bg: "#dcfce7", fg: "#14532d", iconBg: "#bbf7d0", clickable: false },
+              { key: null,            label: "Taux de confirmation",       value: `${stats.confirmationRate}%`,           growth: stats.confirmationRateGrowth, points: true,  icon: <CheckCircle2 size={18}/>, bg: "#fef3c7", fg: "#854d0e", iconBg: "#fde68a", clickable: false },
+              { key: null,            label: "Temps moyen de traitement",  value: fmtMinutes(stats.avgProcessingTimeMin), growth: stats.avgProcessingGrowth,    points: false, icon: <Clock3      size={18}/>,  bg: "#dbeafe", fg: "#1e3a8a", iconBg: "#bfdbfe", clickable: false },
+            ].map((c, idx) => (
+              <button
+                key={idx}
+                onClick={() => c.clickable && setCardFilter(f => f === c.key ? null : c.key)}
+                disabled={!c.clickable}
+                style={{
+                  textAlign: "left", border: "none", cursor: c.clickable ? "pointer" : "default",
+                  background: c.bg, borderRadius: 16, padding: "13px 15px",
+                  display: "flex", flexDirection: "column", gap: 8, minHeight: 86,
+                  boxShadow: c.clickable && cardFilter === c.key ? `0 0 0 2px ${c.fg}` : "none",
+                  transition: "box-shadow .15s",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+                  <p style={{ fontSize: 10, fontWeight: 800, color: c.fg, textTransform: "uppercase", letterSpacing: "0.03em", opacity: 0.85, lineHeight: 1.3 }}>{c.label}</p>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: c.iconBg, color: c.fg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.icon}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: c.fg, lineHeight: 1 }}>{c.value}</h2>
+                  <GrowthBadge value={c.growth} points={c.points} />
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -748,7 +798,21 @@ export default function OrdersPage() {
             )}
           </div>
 
-          {/* Bulk delete — Admin only */}
+          {/* Bulk edit — modifier statut/agent de plusieurs commandes */}
+          {!isAgent && selected.size > 0 && (
+            <button
+              onClick={() => setBulkEdit(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                height: 34, border: "1px solid #0d3938", background: "#beecdf", color: "#0d3938",
+                padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              <Pencil size={13} /> Modifier ({selected.size})
+            </button>
+          )}
+
+          {/* Bulk delete */}
           {!isAgent && selected.size > 0 && (
             <button
               onClick={() => setConfirmDel(true)}
@@ -758,7 +822,7 @@ export default function OrdersPage() {
                 padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer",
               }}
             >
-              <Trash2 size={13} /> Delete ({selected.size})
+              <Trash2 size={13} /> Supprimer ({selected.size})
             </button>
           )}
 
@@ -807,7 +871,7 @@ export default function OrdersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((order, i) => (
+                  {displayedOrders.map((order, i) => (
                     <tr
                       key={order.id}
                       style={{
@@ -848,7 +912,7 @@ export default function OrdersPage() {
 
           {/* ── TÉLÉPHONE : cartes pliables (même organisation des champs) ── */}
           <div className="responsive-cards-mobile">
-            {orders.map((order, i) => {
+            {displayedOrders.map((order, i) => {
               const isOpen   = expanded.has(order.id);
               const rec      = fmtRecall(order.recallAt);
               const isSel    = selected.has(order.id);
@@ -1090,6 +1154,108 @@ export default function OrdersPage() {
           onSave={handleEditSave}
         />
       )}
+
+      {/* ── BULK EDIT MODAL (Modifier en groupe) ── */}
+      {bulkEdit && (
+        <BulkEditModal
+          count={selected.size}
+          statuses={statuses}
+          agents={agents}
+          isAgent={isAgent}
+          onClose={() => setBulkEdit(false)}
+          onSave={handleBulkEdit}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modale "Modifier en groupe" : statut et/ou agent pour les commandes cochées ──
+function BulkEditModal({
+  count, statuses, agents, isAgent, onClose, onSave,
+}: {
+  count: number;
+  statuses: Status[];
+  agents: Agent[];
+  isAgent: boolean;
+  onClose: () => void;
+  onSave: (patch: { statusId?: string; agentId?: string }) => void;
+}) {
+  const [statusId, setStatusId] = useState("");
+  const [agentId,  setAgentId]  = useState("");
+  const [saving,   setSaving]   = useState(false);
+
+  const apply = async () => {
+    const patch: { statusId?: string; agentId?: string } = {};
+    if (statusId) patch.statusId = statusId;
+    if (agentId)  patch.agentId  = agentId;
+    if (Object.keys(patch).length === 0) { onClose(); return; }
+    setSaving(true);
+    await onSave(patch);
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+    }}>
+      <div className="glass-card" style={{ padding: 20, width: 320 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <strong style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            <Pencil size={14} /> Modifier {count} commande{count > 1 ? "s" : ""}
+          </strong>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}>
+            <X size={14} />
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>
+          Laisse un champ vide pour ne pas y toucher.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>
+              Nouveau statut
+            </label>
+            <select
+              value={statusId}
+              onChange={e => setStatusId(e.target.value)}
+              style={{ width: "100%", height: 36, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, padding: "0 10px", background: "white", cursor: "pointer" }}
+            >
+              <option value="">— Ne pas changer —</option>
+              {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          {!isAgent && (
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                Réassigner à l&apos;agent
+              </label>
+              <select
+                value={agentId}
+                onChange={e => setAgentId(e.target.value)}
+                style={{ width: "100%", height: 36, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12, padding: "0 10px", background: "white", cursor: "pointer" }}
+              >
+                <option value="">— Ne pas changer —</option>
+                {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          <button
+            onClick={apply}
+            disabled={saving}
+            style={{
+              padding: "9px 12px", borderRadius: 9, border: "none",
+              background: "#0d3938", color: "white", fontSize: 12, fontWeight: 700,
+              cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "Application…" : "Appliquer"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
