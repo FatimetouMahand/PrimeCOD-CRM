@@ -44,7 +44,7 @@ async function generateCode(name: string): Promise<string> {
 export async function GET(request: Request) {
   // Admin only
   const role = await getCallerRole();
-  if (role !== "Admin") {
+  if (role !== "ADMIN") {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
 

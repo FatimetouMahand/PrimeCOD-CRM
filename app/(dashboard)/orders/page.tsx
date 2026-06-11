@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Search, Trash2, UserCheck, Bell, BarChart2,
   SlidersHorizontal, ChevronDown, X, Calendar,
-  ShoppingCart, CheckCircle2, Clock3, DollarSign,
+  ShoppingCart, CheckCircle2, Clock3, DollarSign, PhoneCall,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
 
@@ -13,29 +13,65 @@ interface Agent   { id: string; name: string; }
 interface Status  { id: string; name: string; color: string; alertAfterHours?: number | null; isFinal?: boolean; }
 interface Product { id: string; name: string; }
 interface Order {
-  id: string; customer: string; phone: string; city: string;
+  id: string; orderNumber: number | null; customer: string; phone: string; city: string;
   price: number; quantity: number; revenue: number; createdAt: string;
+  notes: string | null; attempts: number; recallAt: string | null; processingTimeMin: number | null;
   status: Status; product: Product; agent: Agent | null;
 }
 interface Stats { total: number; revenue: number; confirmed: number; pending: number; }
 
 // ── Column definitions ─────────────────────────────────────────────────────
 const COLS = [
-  { key: "num",      label: "#",        hideable: false },
-  { key: "date",     label: "Date",     hideable: true  },
-  { key: "customer", label: "Customer", hideable: false },
-  { key: "phone",    label: "Phone",    hideable: true  },
-  { key: "city",     label: "City",     hideable: true  },
-  { key: "product",  label: "Product",  hideable: true  },
-  { key: "price",    label: "Price",    hideable: true  },
-  { key: "qty",      label: "Qty",      hideable: true  },
-  { key: "revenue",  label: "Revenue",  hideable: true  },
-  { key: "agent",    label: "Agent",    hideable: true  },
-  { key: "status",   label: "Status",   hideable: false },
+  { key: "num",        label: "#",            hideable: false },
+  { key: "date",       label: "Date",         hideable: true  },
+  { key: "customer",   label: "Customer",     hideable: false },
+  { key: "phone",      label: "Phone",        hideable: true  },
+  { key: "city",       label: "City",         hideable: true  },
+  { key: "product",    label: "Product",      hideable: true  },
+  { key: "price",      label: "Price",        hideable: true  },
+  { key: "qty",        label: "Qty",          hideable: true  },
+  { key: "revenue",    label: "Revenue",      hideable: true  },
+  { key: "agent",      label: "Agent",        hideable: true  },
+  { key: "attempts",   label: "Tentatives",   hideable: true  },
+  { key: "processing", label: "Traitement",   hideable: true  },
+  { key: "recall",     label: "Rappel",       hideable: true  },
+  { key: "notes",      label: "Notes",        hideable: true  },
+  { key: "status",     label: "Status",       hideable: false },
 ];
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+// Temps de traitement (minutes) → "8 min" / "2h15"
+function fmtMinutes(min: number | null | undefined): string {
+  if (min == null) return "—";
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
+}
+
+// Délai de suivi relatif à maintenant → "Après 1j 16h" / "En retard de 3h"
+function fmtRecall(recallAt: string | null | undefined): { text: string; overdue: boolean } {
+  if (!recallAt) return { text: "—", overdue: false };
+  const diffMin = Math.round((new Date(recallAt).getTime() - Date.now()) / 60000);
+  const overdue = diffMin < 0;
+  const abs   = Math.abs(diffMin);
+  const days  = Math.floor(abs / 1440);
+  const hours = Math.floor((abs % 1440) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}j`);
+  parts.push(`${hours}h`);
+  const dur = parts.join(" ");
+  return overdue ? { text: `En retard de ${dur}`, overdue: true } : { text: `Après ${dur}`, overdue: false };
+}
+
+// ISO string → valeur utilisable par <input type="datetime-local">
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────
@@ -68,12 +104,13 @@ export default function OrdersPage() {
   const [confirmDel,   setConfirmDel]   = useState(false);
   const [reassignId,   setReassignId]   = useState<string | null>(null);
   const [statusTarget, setStatusTarget] = useState<string | null>(null);
+  const [editTarget,   setEditTarget]   = useState<Order | null>(null);
 
   const sentinel  = useRef<HTMLDivElement>(null);
   const searchTmr = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const user    = useUser();
-  const isAgent = user?.role === "Agent";
+  const isAgent = user?.role === "AGENT" || user?.role === "AGENT_TEST";
 
   // ── Fetch orders ──────────────────────────────────────────────────────
   const load = useCallback(async (opts: {
@@ -209,6 +246,40 @@ export default function OrdersPage() {
     setReassignId(null);
   };
 
+  // ── Sauvegarde notes / tentatives / rappel (modale d'édition) ─────────
+  const handleEditSave = async (id: string, patch: { notes?: string | null; attempts?: number; recallAt?: string | null }) => {
+    const res = await fetch(`/api/orders/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setOrders(prev => prev.map(o => o.id === id ? {
+        ...o,
+        notes: updated.notes,
+        attempts: updated.attempts,
+        recallAt: updated.recallAt,
+      } : o));
+    }
+    setEditTarget(null);
+  };
+
+  // ── Incrémenter rapidement le nombre de tentatives d'appel ────────────
+  const incrementAttempts = async (o: Order) => {
+    const next = (o.attempts ?? 0) + 1;
+    setOrders(prev => prev.map(x => x.id === o.id ? { ...x, attempts: next } : x));
+    const res = await fetch(`/api/orders/${o.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attempts: next }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setOrders(prev => prev.map(x => x.id === o.id ? { ...x, attempts: updated.attempts } : x));
+    }
+  };
+
   // ── Reminders: commandes non-finales avec alerte dépassée ─────────────
   const reminders = orders.filter(o => {
     if (o.status?.isFinal) return false;             // commande terminée → pas de rappel
@@ -224,7 +295,7 @@ export default function OrdersPage() {
   // ── Cell render ───────────────────────────────────────────────────────
   const cell = (k: string, o: Order, i: number) => {
     switch (k) {
-      case "num":      return <span style={{ color: "#9ca3af", fontWeight: 600 }}>#{i + 1}</span>;
+      case "num":      return <span style={{ color: "#9ca3af", fontWeight: 600 }}>#{o.orderNumber ?? i + 1}</span>;
       case "date":     return <span style={{ color: "#6b7280" }}>{fmtDate(o.createdAt)}</span>;
       case "customer": return <strong style={{ fontWeight: 700 }}>{o.customer}</strong>;
       case "phone":    return <span style={{ color: "#6b7280", fontFamily: "monospace" }}>{o.phone}</span>;
@@ -248,6 +319,46 @@ export default function OrdersPage() {
             }}
           >
             {o.agent?.name ?? "Unassigned"} <ChevronDown size={10} />
+          </button>
+        );
+      case "attempts":
+        return (
+          <button
+            onClick={() => incrementAttempts(o)}
+            title="Cliquer pour ajouter une tentative d'appel"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              background: "none", border: "1px solid #e5e7eb", borderRadius: "8px",
+              padding: "3px 9px", fontSize: "10px", cursor: "pointer",
+              color: "#374151", fontWeight: 700,
+            }}
+          >
+            <PhoneCall size={10} /> {o.attempts ?? 0}
+          </button>
+        );
+      case "processing":
+        return <span style={{ color: "#6b7280", fontSize: "11px" }}>{fmtMinutes(o.processingTimeMin)}</span>;
+      case "recall": {
+        const r = fmtRecall(o.recallAt);
+        return (
+          <span style={{ color: r.overdue ? "#dc2626" : "#6b7280", fontSize: "11px", fontWeight: r.overdue ? 700 : 400, display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {r.overdue && <Bell size={10} />} {r.text}
+          </span>
+        );
+      }
+      case "notes":
+        return (
+          <button
+            onClick={() => setEditTarget(o)}
+            title="Cliquer pour modifier les notes"
+            style={{
+              display: "block", maxWidth: "160px", textAlign: "left",
+              background: "none", border: "none", cursor: "pointer",
+              color: o.notes ? "#374151" : "#9ca3af", fontSize: "11px",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}
+          >
+            {o.notes || "Ajouter une note…"}
           </button>
         );
       case "status": {
@@ -761,6 +872,116 @@ export default function OrdersPage() {
           </div>
         </div>
       )}
+
+      {/* ── EDIT NOTES / TENTATIVES / RAPPEL MODAL ── */}
+      {editTarget && (
+        <EditOrderModal
+          order={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSave={handleEditSave}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modale d'édition : Notes, Tentatives d'appel, Délai de rappel ──────────
+function EditOrderModal({
+  order, onClose, onSave,
+}: {
+  order: Order;
+  onClose: () => void;
+  onSave: (id: string, patch: { notes?: string | null; attempts?: number; recallAt?: string | null }) => void;
+}) {
+  const [notes,    setNotes]    = useState(order.notes ?? "");
+  const [attempts, setAttempts] = useState(order.attempts ?? 0);
+  const [recallAt, setRecallAt] = useState(order.recallAt ? toLocalInput(order.recallAt) : "");
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+    }}>
+      <div className="glass-card" style={{ padding: 20, width: 320 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <strong style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            <PhoneCall size={14} /> Suivi de la commande
+          </strong>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}>
+            <X size={14} />
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>
+              Tentatives d&apos;appel
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                onClick={() => setAttempts(a => Math.max(0, a - 1))}
+                style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #e5e7eb", background: "white", cursor: "pointer", fontWeight: 700 }}
+              >
+                −
+              </button>
+              <span style={{ fontWeight: 700, fontSize: 13, minWidth: 24, textAlign: "center" }}>{attempts}</span>
+              <button
+                onClick={() => setAttempts(a => a + 1)}
+                style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #e5e7eb", background: "white", cursor: "pointer", fontWeight: 700 }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>
+              Rappel programmé (délai de suivi)
+            </label>
+            <input
+              type="datetime-local"
+              value={recallAt}
+              onChange={e => setRecallAt(e.target.value)}
+              style={{ width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 11 }}
+            />
+            {recallAt && (
+              <button
+                onClick={() => setRecallAt("")}
+                style={{ marginTop: 4, background: "none", border: "none", color: "#dc2626", fontSize: 10, cursor: "pointer", padding: 0 }}
+              >
+                Effacer le rappel
+              </button>
+            )}
+          </div>
+
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", display: "block", marginBottom: 4 }}>
+              Notes / Commentaires
+            </label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={4}
+              placeholder="Ajouter une note sur cette commande…"
+              style={{ width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 11, resize: "vertical", fontFamily: "inherit" }}
+            />
+          </div>
+
+          <button
+            onClick={() => onSave(order.id, {
+              notes: notes.trim() === "" ? null : notes,
+              attempts,
+              recallAt: recallAt === "" ? null : new Date(recallAt).toISOString(),
+            })}
+            style={{
+              padding: "9px 12px", borderRadius: 9, border: "none",
+              background: "#16a34a", color: "white", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            Enregistrer
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

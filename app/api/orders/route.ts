@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   };
 
   // Role-based filtering
-  if (caller?.role === "Agent") {
+  if (caller?.role === "AGENT" || caller?.role === "AGENT_TEST") {
     // Agent sees only their own orders
     where.agentId = caller.id;
     // Agent does NOT see orders with incomplete phone numbers (< 8 chars)
@@ -104,7 +104,7 @@ export async function DELETE(request: Request) {
   try {
     const caller = await getCaller();
     // Only Admin can delete orders
-    if (caller?.role !== "Admin") {
+    if (caller?.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

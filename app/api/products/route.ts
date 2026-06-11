@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   const role = await getCallerRole();
-  if (role !== "Admin") {
+  if (role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden — Admin only" }, { status: 403 });
   }
   try {

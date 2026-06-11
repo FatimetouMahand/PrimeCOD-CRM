@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const product = searchParams.get("product");
 
     // Check caller role — Agent sees only their own stats
-    let callerRole = "Admin";
+    let callerRole = "ADMIN";
     let callerId   = "";
     try {
       const cookieStore = await cookies();
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         : {}),
       ...(startDate ? { createdAt: { gte: startDate } } : {}),
       // Agent sees only their own orders
-      ...(callerRole === "Agent" ? { agentId: callerId } : {}),
+      ...((callerRole === "AGENT" || callerRole === "AGENT_TEST") ? { agentId: callerId } : {}),
     };
 
     const orders = await prisma.order.findMany({
