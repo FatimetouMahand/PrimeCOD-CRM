@@ -23,13 +23,13 @@ function Card({ title, subtitle, children }: {
 }) {
   return (
     <div style={{
-      background: "white", borderRadius: 16, padding: "20px 22px",
+      background: "white", borderRadius: 14, padding: "14px 16px",
       border: "1px solid #edf0f5", boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: subtitle ? 2 : 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: subtitle ? 2 : 12 }}>
         {title}
       </div>
-      {subtitle && <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 14px" }}>{subtitle}</p>}
+      {subtitle && <p style={{ fontSize: 11, color: "#9ca3af", margin: "0 0 12px" }}>{subtitle}</p>}
       {children}
     </div>
   );
@@ -432,7 +432,7 @@ function ShopifyTab() {
             background: "#f9fafb", border: "1.5px dashed #d1d5db",
             borderRadius: 12, padding: 16, marginTop: stores.length > 0 ? 8 : 0,
           }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <div className="stack-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
               <div>
                 <label style={LS}>Nom de la boutique</label>
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Mon Store" style={IS} />
@@ -520,7 +520,7 @@ function SystemTab() {
       {stats ? (
         <>
           <Card title="Taille de la base de données">
-            <div style={{ fontSize: 38, fontWeight: 900, color: "#111827", letterSpacing: -1 }}>
+            <div style={{ fontSize: 30, fontWeight: 900, color: "#111827", letterSpacing: -1 }}>
               {stats.dbSize}
             </div>
             <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0" }}>
@@ -528,7 +528,7 @@ function SystemTab() {
             </p>
           </Card>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8 }}>
             {([
               { label: "Commandes",  value: stats.orders,   color: "#0d3938" },
               { label: "Employés",   value: stats.users,    color: "#0ea5e9" },
@@ -536,13 +536,13 @@ function SystemTab() {
               { label: "Statuts",    value: stats.statuses, color: "#10b981" },
             ] as const).map(item => (
               <div key={item.label} style={{
-                background: "white", borderRadius: 14, padding: "18px 20px",
+                background: "white", borderRadius: 14, padding: "14px 16px",
                 border: "1px solid #edf0f5", boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
               }}>
                 <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginBottom: 4 }}>
                   {item.label}
                 </div>
-                <div style={{ fontSize: 30, fontWeight: 900, color: item.color }}>
+                <div style={{ fontSize: 26, fontWeight: 900, color: item.color }}>
                   {item.value.toLocaleString()}
                 </div>
               </div>
@@ -577,20 +577,20 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<"general" | "shopify" | "system">("general");
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 860, margin: "0 auto" }}>
+    <div style={{ maxWidth: 860, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: "#111827", margin: 0 }}>Paramètres</h1>
-        <p style={{ fontSize: 12, color: "#9ca3af", margin: "4px 0 0" }}>
+      <div style={{ marginBottom: 14 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>Paramètres</h1>
+        <p style={{ fontSize: 11, color: "#9ca3af", margin: "3px 0 0" }}>
           Configuration du système PrimeCOD
         </p>
       </div>
 
       {/* Tab bar */}
       <div style={{
-        display: "flex", gap: 4, marginBottom: 22,
+        display: "flex", gap: 4, marginBottom: 14,
         background: "#f3f4f6", borderRadius: 12, padding: 4,
-        width: "fit-content",
+        width: "fit-content", maxWidth: "100%", overflowX: "auto",
       }}>
         {TABS.map(({ id, label, Icon }) => (
           <button key={id} onClick={() => setTab(id)} style={{
