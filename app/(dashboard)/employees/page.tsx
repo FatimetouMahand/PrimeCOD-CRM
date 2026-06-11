@@ -3,8 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   UserPlus, Trash2, Edit2, Search, Users, CheckCircle2, UserX,
-  ShieldCheck, X, Eye, EyeOff, Key, Pause, Play, Send, LogOut,
-  ShieldAlert, Calendar, Clock,
+  ShieldCheck, X, Eye, EyeOff, Key, Send, LogOut,
+  ShieldAlert, Calendar, Clock, ChevronDown,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -113,6 +113,10 @@ export default function EmployeesPage() {
   const [pwdTarget,  setPwdTarget]  = useState<Employee | null>(null);
   const [viewPwdTarget, setViewPwdTarget] = useState<Employee | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [expanded,   setExpanded]   = useState<Set<string>>(new Set()); // cartes dépliées (mobile)
+
+  const toggleExpand = (id: string) =>
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const load = useCallback(async (f = filter) => {
     setLoading(true);
@@ -185,20 +189,20 @@ export default function EmployeesPage() {
       </div>
 
       {/* STATS */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8, marginBottom: 12 }}>
         {[
-          { label: "Total",     value: total,     icon: <Users        size={14}/>, bg: "#beecdf" },
-          { label: "En ligne",  value: online,    icon: <CheckCircle2 size={14}/>, bg: "#dcfce7" },
-          { label: "Suspendus", value: suspended, icon: <UserX        size={14}/>, bg: "#fee2e2" },
-          { label: "Agents",    value: agents,    icon: <ShieldCheck  size={14}/>, bg: "#dbeafe" },
+          { label: "Total",     value: total,     icon: <Users        size={13}/>, bg: "#beecdf" },
+          { label: "En ligne",  value: online,    icon: <CheckCircle2 size={13}/>, bg: "#dcfce7" },
+          { label: "Suspendus", value: suspended, icon: <UserX        size={13}/>, bg: "#fee2e2" },
+          { label: "Agents",    value: agents,    icon: <ShieldCheck  size={13}/>, bg: "#dbeafe" },
         ].map(s => (
           <div key={s.label} className="glass-card">
-            <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <p style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>{s.label}</p>
-                <h2 style={{ fontSize: 18, fontWeight: 800 }}>{s.value}</h2>
+                <p style={{ fontSize: 9, color: "#6b7280", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: 700 }}>{s.label}</p>
+                <h2 style={{ fontSize: 16, fontWeight: 800 }}>{s.value}</h2>
               </div>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
+              <div style={{ width: 28, height: 28, borderRadius: 9, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
             </div>
           </div>
         ))}
@@ -226,118 +230,171 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* TABLE */}
-      <div className="glass-card">
-        <div style={{ overflowX: "auto" }}>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Chargement…</div>
-          ) : displayed.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Aucun employé trouvé</div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #f3f4f6", textAlign: "left" }}>
-                  <th style={th}><input type="checkbox" checked={selected.size === displayed.length && displayed.length > 0} onChange={() => toggleAll(displayed)} style={{ cursor: "pointer" }} /></th>
-                  {["Employé", "Téléphone", "Rôle", "Connexion", "Compte", "Début", "Dernière conn.", "Commandes", "Paiement", "Telegram", "Actions"].map(h => (
-                    <th key={h} style={th}>{h}</th>
+      {/* LISTE DES EMPLOYÉS — tableau (PC) + cartes (téléphone) */}
+      {loading ? (
+        <div className="glass-card" style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Chargement…</div>
+      ) : displayed.length === 0 ? (
+        <div className="glass-card" style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Aucun employé trouvé</div>
+      ) : (
+        <>
+          {/* ── GRAND ÉCRAN : tableau ── */}
+          <div className="responsive-table-desktop glass-card">
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #f3f4f6", textAlign: "left" }}>
+                    <th style={th}><input type="checkbox" checked={selected.size === displayed.length && displayed.length > 0} onChange={() => toggleAll(displayed)} style={{ cursor: "pointer" }} /></th>
+                    {["Employé", "Téléphone", "Rôle", "Connexion", "Compte", "Début", "Dernière conn.", "Commandes", "Paiement", "Telegram", "Actions"].map(h => (
+                      <th key={h} style={th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayed.map(emp => (
+                    <tr key={emp.id} style={{ borderBottom: "1px solid #f9fafb", background: selected.has(emp.id) ? "#f0f7f4" : "transparent", opacity: emp.isActive ? 1 : 0.65 }}
+                      onMouseEnter={e => { if (!selected.has(emp.id)) (e.currentTarget as HTMLElement).style.background = "#f9fafb"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selected.has(emp.id) ? "#f0f7f4" : "transparent"; }}>
+
+                      <td style={td}><input type="checkbox" checked={selected.has(emp.id)} onChange={() => toggleOne(emp.id)} style={{ cursor: "pointer" }} /></td>
+
+                      <td style={td}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                          <div style={{ position: "relative" }}>
+                            <Avatar name={emp.name} color={emp.iconColor} />
+                            <span style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#d1d5db", border: "2px solid white" }} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700 }}>{emp.name}</div>
+                            {!emp.isActive && <div style={{ fontSize: 9, color: "#ef4444", fontWeight: 700 }}>SUSPENDU</div>}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td style={{ ...td, fontFamily: "monospace", color: "#6b7280" }}>{emp.phone}</td>
+                      <td style={td}><RoleBadge role={emp.role} /></td>
+
+                      <td style={td}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: "999px", fontSize: 10, fontWeight: 700, background: emp.status === "ONLINE" ? "#dcfce7" : "#f3f4f6", color: emp.status === "ONLINE" ? "#16a34a" : "#6b7280" }}>
+                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#9ca3af", display: "inline-block" }} />
+                          {emp.status === "ONLINE" ? "En ligne" : "Hors ligne"}
+                        </span>
+                      </td>
+
+                      {/* Compte → interrupteur on/off */}
+                      <td style={td}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <AccountToggle active={emp.isActive} onToggle={() => toggleSuspend(emp)} />
+                          <span style={{ fontSize: 10, fontWeight: 700, color: emp.isActive ? "#16a34a" : "#9ca3af" }}>{emp.isActive ? "Actif" : "Suspendu"}</span>
+                        </div>
+                      </td>
+
+                      <td style={{ ...td, color: "#6b7280" }}>
+                        {emp.startDate
+                          ? <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={10} />{fmtDate(emp.startDate)}</span>
+                          : <span style={{ color: "#d1d5db" }}>—</span>}
+                      </td>
+
+                      <td style={{ ...td, color: "#6b7280" }}>
+                        {emp.lastLogin
+                          ? <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={10} />{fmtDateTime(emp.lastLogin)}</span>
+                          : <span style={{ color: "#d1d5db" }}>Jamais</span>}
+                      </td>
+
+                      <td style={{ ...td, fontWeight: 700 }}>{emp.orderCount}</td>
+
+                      <td style={td}>
+                        {emp.paymentDefaultDays > 0
+                          ? <span style={{ fontSize: 10, color: emp.paymentRemainingDays <= 3 ? "#ef4444" : "#16a34a", fontWeight: 700 }}>{emp.paymentRemainingDays}j / {emp.paymentDefaultDays}j</span>
+                          : <span style={{ color: "#d1d5db", fontSize: 10 }}>—</span>}
+                      </td>
+
+                      <td style={td}>
+                        {emp.telegramChatId
+                          ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700 }}><Send size={9} />Lié</span>
+                          : <span style={{ color: "#d1d5db", fontSize: 10 }}>—</span>}
+                      </td>
+
+                      <td style={td}>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <ActionBtn icon={<Edit2 size={12} color="#6b7280" />} title="Modifier"             onClick={() => setEditTarget(emp)} />
+                          <ActionBtn icon={<Key   size={12} color="#6b7280" />} title="Changer mot de passe" onClick={() => setPwdTarget(emp)} />
+                          <ActionBtn icon={<Eye   size={12} color="#2563eb" />} title="Voir mot de passe"    onClick={() => setViewPwdTarget(emp)} bg="#dbeafe" />
+                          {emp.status === "ONLINE" && (
+                            <ActionBtn icon={<LogOut size={11} color="#ef4444" />} title="Déconnecter à distance" onClick={() => forceLogout(emp)} bg="#fee2e2" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {displayed.map(emp => (
-                  <tr key={emp.id} style={{ borderBottom: "1px solid #f9fafb", background: selected.has(emp.id) ? "#f0f7f4" : "transparent", opacity: emp.isActive ? 1 : 0.65 }}
-                    onMouseEnter={e => { if (!selected.has(emp.id)) (e.currentTarget as HTMLElement).style.background = "#f9fafb"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selected.has(emp.id) ? "#f0f7f4" : "transparent"; }}>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-                    <td style={td}><input type="checkbox" checked={selected.has(emp.id)} onChange={() => toggleOne(emp.id)} style={{ cursor: "pointer" }} /></td>
+          {/* ── TÉLÉPHONE : cartes pliables ── */}
+          <div className="responsive-cards-mobile">
+            {displayed.map(emp => {
+              const isOpen = expanded.has(emp.id);
+              return (
+                <div key={emp.id} className="glass-card" style={{ overflow: "hidden", opacity: emp.isActive ? 1 : 0.75, background: selected.has(emp.id) ? "#f0f7f4" : undefined }}>
+                  {/* En-tête */}
+                  <div onClick={() => toggleExpand(emp.id)} style={{ padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                    <input type="checkbox" checked={selected.has(emp.id)} onClick={e => e.stopPropagation()} onChange={() => toggleOne(emp.id)} style={{ cursor: "pointer", flexShrink: 0, width: 16, height: 16 }} />
+                    <div style={{ position: "relative", flexShrink: 0 }}>
+                      <Avatar name={emp.name} color={emp.iconColor} />
+                      <span style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#d1d5db", border: "2px solid white" }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.name || "—"}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "monospace" }}>{emp.phone}</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <RoleBadge role={emp.role} />
+                      <button onClick={() => toggleExpand(emp.id)} aria-label={isOpen ? "Réduire" : "Détails"}
+                        style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, border: "1px solid #e5e7eb", background: isOpen ? "#0d3938" : "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s ease" }}>
+                        <ChevronDown size={14} color={isOpen ? "white" : "#9ca3af"} />
+                      </button>
+                    </div>
+                  </div>
 
-                    {/* Name */}
-                    <td style={td}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                        <div style={{ position: "relative" }}>
-                          <Avatar name={emp.name} color={emp.iconColor} />
-                          <span style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#d1d5db", border: "2px solid white" }} />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{emp.name}</div>
-                          {!emp.isActive && <div style={{ fontSize: 9, color: "#ef4444", fontWeight: 700 }}>SUSPENDU</div>}
-                        </div>
+                  {/* Détails */}
+                  {isOpen && (
+                    <div style={{ padding: "0 13px 13px", borderTop: "1px solid #f3f4f6" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                        <CardField label="Compte">
+                          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                            <AccountToggle active={emp.isActive} onToggle={() => toggleSuspend(emp)} />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: emp.isActive ? "#16a34a" : "#9ca3af" }}>{emp.isActive ? "Actif" : "Suspendu"}</span>
+                          </div>
+                        </CardField>
+                        <CardField label="Connexion">
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: emp.status === "ONLINE" ? "#16a34a" : "#6b7280" }}>
+                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#9ca3af" }} />
+                            {emp.status === "ONLINE" ? "En ligne" : "Hors ligne"}
+                          </span>
+                        </CardField>
+                        <CardField label="Début">{emp.startDate ? fmtDate(emp.startDate) : "—"}</CardField>
+                        <CardField label="Dernière conn.">{emp.lastLogin ? fmtDateTime(emp.lastLogin) : "Jamais"}</CardField>
+                        <CardField label="Commandes">{emp.orderCount}</CardField>
+                        <CardField label="Paiement">{emp.paymentDefaultDays > 0 ? `${emp.paymentRemainingDays}j / ${emp.paymentDefaultDays}j` : "—"}</CardField>
+                        <CardField label="Telegram">{emp.telegramChatId ? "Lié" : "—"}</CardField>
                       </div>
-                    </td>
-
-                    <td style={{ ...td, fontFamily: "monospace", color: "#6b7280" }}>{emp.phone}</td>
-                    <td style={td}><RoleBadge role={emp.role} /></td>
-
-                    {/* Online */}
-                    <td style={td}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: "999px", fontSize: 10, fontWeight: 700, background: emp.status === "ONLINE" ? "#dcfce7" : "#f3f4f6", color: emp.status === "ONLINE" ? "#16a34a" : "#6b7280" }}>
-                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#9ca3af", display: "inline-block" }} />
-                        {emp.status === "ONLINE" ? "En ligne" : "Hors ligne"}
-                      </span>
-                    </td>
-
-                    {/* Account */}
-                    <td style={td}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: "999px", fontSize: 10, fontWeight: 700, background: emp.isActive ? "#beecdf" : "#fee2e2", color: emp.isActive ? "#0d3938" : "#dc2626" }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
-                        {emp.isActive ? "Actif" : "Suspendu"}
-                      </span>
-                    </td>
-
-                    {/* Start date */}
-                    <td style={{ ...td, color: "#6b7280" }}>
-                      {emp.startDate
-                        ? <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={10} />{fmtDate(emp.startDate)}</span>
-                        : <span style={{ color: "#d1d5db" }}>—</span>}
-                    </td>
-
-                    {/* Last login */}
-                    <td style={{ ...td, color: "#6b7280" }}>
-                      {emp.lastLogin
-                        ? <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={10} />{fmtDateTime(emp.lastLogin)}</span>
-                        : <span style={{ color: "#d1d5db" }}>Jamais</span>}
-                    </td>
-
-                    <td style={{ ...td, fontWeight: 700 }}>{emp.orderCount}</td>
-
-                    {/* Payment */}
-                    <td style={td}>
-                      {emp.paymentDefaultDays > 0
-                        ? <span style={{ fontSize: 10, color: emp.paymentRemainingDays <= 3 ? "#ef4444" : "#16a34a", fontWeight: 700 }}>{emp.paymentRemainingDays}j / {emp.paymentDefaultDays}j</span>
-                        : <span style={{ color: "#d1d5db", fontSize: 10 }}>—</span>}
-                    </td>
-
-                    {/* Telegram */}
-                    <td style={td}>
-                      {emp.telegramChatId
-                        ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#e0f2fe", color: "#0369a1", padding: "3px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700 }}><Send size={9} />Lié</span>
-                        : <span style={{ color: "#d1d5db", fontSize: 10 }}>—</span>}
-                    </td>
-
-                    {/* Actions */}
-                    <td style={td}>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        <ActionBtn icon={<Edit2 size={12} color="#6b7280" />}   title="Modifier"              onClick={() => setEditTarget(emp)} />
-                        <ActionBtn icon={<Key   size={12} color="#6b7280" />}   title="Changer mot de passe"  onClick={() => setPwdTarget(emp)} />
-                        <ActionBtn icon={<Eye   size={12} color="#2563eb" />}   title="Voir mot de passe"     onClick={() => setViewPwdTarget(emp)} bg="#dbeafe" />
-                        <ActionBtn
-                          icon={emp.isActive ? <Pause size={11} color="#d97706" /> : <Play size={11} color="#16a34a" />}
-                          title={emp.isActive ? "Suspendre" : "Réactiver"}
-                          onClick={() => toggleSuspend(emp)}
-                          bg={emp.isActive ? "#fef3c7" : "#dcfce7"}
-                        />
+                      <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+                        <ActionBtn icon={<Edit2 size={12} color="#6b7280" />} title="Modifier"             onClick={() => setEditTarget(emp)} />
+                        <ActionBtn icon={<Key   size={12} color="#6b7280" />} title="Changer mot de passe" onClick={() => setPwdTarget(emp)} />
+                        <ActionBtn icon={<Eye   size={12} color="#2563eb" />} title="Voir mot de passe"    onClick={() => setViewPwdTarget(emp)} bg="#dbeafe" />
                         {emp.status === "ONLINE" && (
                           <ActionBtn icon={<LogOut size={11} color="#ef4444" />} title="Déconnecter à distance" onClick={() => forceLogout(emp)} bg="#fee2e2" />
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* MODALS */}
       {showAdd          && <AddModal    onClose={() => setShowAdd(false)}    onCreated={emp => { setEmployees(prev => [emp, ...prev]); setShowAdd(false); }} />}
@@ -631,6 +688,36 @@ function ActionBtn({ icon, title, onClick, bg = "white" }: { icon: React.ReactNo
   );
 }
 
+// Interrupteur on/off du compte (actif / suspendu) — comme l'ancien app
+function AccountToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onToggle(); }}
+      title={active ? "Suspendre le compte" : "Réactiver le compte"}
+      style={{
+        position: "relative", width: 34, height: 19, borderRadius: 999, border: "none",
+        background: active ? "#22c55e" : "#d1d5db", cursor: "pointer", padding: 0, flexShrink: 0,
+        transition: "background .2s",
+      }}
+    >
+      <span style={{
+        position: "absolute", top: 2, left: active ? 17 : 2, width: 15, height: 15,
+        borderRadius: "50%", background: "white", transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+      }} />
+    </button>
+  );
+}
+
+// Champ "label + valeur" pour les cartes mobiles
+function CardField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+      <span style={{ fontSize: 9, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em" }}>{label}</span>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{children}</div>
+    </div>
+  );
+}
+
 function ModalWrapper({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div style={overlayStyle}>
@@ -682,5 +769,5 @@ const inputStyle:   React.CSSProperties = { width: "100%", height: 36, border: "
 const submitStyle:  React.CSSProperties = { border: "none", background: "#0d3938", color: "white", padding: "10px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%" };
 const cancelBtnStyle: React.CSSProperties = { border: "1px solid #e5e7eb", background: "white", padding: "9px 20px", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" };
 const greenBtn:    React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, border: "none", background: "#0d3938", color: "white", padding: "9px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer" };
-const th: React.CSSProperties = { padding: "11px 14px", fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" };
-const td: React.CSSProperties = { padding: "10px 14px" };
+const th: React.CSSProperties = { padding: "8px 12px", fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.02em" };
+const td: React.CSSProperties = { padding: "7px 12px", whiteSpace: "nowrap" };
