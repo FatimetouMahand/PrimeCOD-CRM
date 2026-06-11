@@ -126,6 +126,7 @@ export default function OrdersPage() {
   const [filterDateTo,  setFilterDateTo]  = useState(""); // fin de plage (optionnel)
 
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
+  const [expanded,     setExpanded]     = useState<Set<string>>(new Set()); // cartes dépliées (mobile)
   const [showStats,    setShowStats]    = useState(true);
   const [showRemind,   setShowRemind]   = useState(false);
   const [showColMenu,  setShowColMenu]  = useState(false);
@@ -247,6 +248,10 @@ export default function OrdersPage() {
 
   const toggleAll = () =>
     setSelected(prev => prev.size === orders.length ? new Set() : new Set(orders.map(o => o.id)));
+
+  // ── Carte mobile dépliée / repliée ────────────────────────────────────
+  const toggleExpand = (id: string) =>
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   // ── Bulk delete ───────────────────────────────────────────────────────
   const handleDelete = async () => {
@@ -771,83 +776,184 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* ── TABLE ── */}
-      <div className="glass-card">
-        <div style={{ overflowX: "auto" }}>
-          {loading ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Loading orders…</div>
-          ) : orders.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>No orders found</div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #f3f4f6", textAlign: "left" }}>
-                  {!isAgent && (
-                    <th style={{ padding: "11px 14px", width: 36 }}>
-                      <input
-                        type="checkbox"
-                        checked={selected.size > 0 && selected.size === orders.length}
-                        onChange={toggleAll}
-                        style={{ cursor: "pointer" }}
-                      />
-                    </th>
-                  )}
-                  {visible.map(col => (
-                    <th key={col.key} style={{ padding: "11px 14px", fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
-                      {col.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order, i) => (
-                  <tr
-                    key={order.id}
-                    style={{
-                      borderBottom: "1px solid #f9fafb",
-                      background: selected.has(order.id) ? "#f0f7f4" : "transparent",
-                      cursor: "default",
-                    }}
-                    onMouseEnter={e => {
-                      if (!selected.has(order.id))
-                        (e.currentTarget as HTMLElement).style.background = "#f9fafb";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background =
-                        selected.has(order.id) ? "#f0f7f4" : "transparent";
-                    }}
-                  >
+      {/* ── LISTE DES COMMANDES ── */}
+      {loading ? (
+        <div className="glass-card" style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Chargement des commandes…</div>
+      ) : orders.length === 0 ? (
+        <div className="glass-card" style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>Aucune commande</div>
+      ) : (
+        <>
+          {/* ── GRAND ÉCRAN : tableau classique ── */}
+          <div className="responsive-table-desktop glass-card">
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #f3f4f6", textAlign: "left" }}>
                     {!isAgent && (
-                      <td style={{ padding: "9px 14px" }}>
+                      <th style={{ padding: "11px 14px", width: 36 }}>
                         <input
                           type="checkbox"
-                          checked={selected.has(order.id)}
-                          onChange={() => toggleOne(order.id)}
+                          checked={selected.size > 0 && selected.size === orders.length}
+                          onChange={toggleAll}
                           style={{ cursor: "pointer" }}
                         />
-                      </td>
+                      </th>
                     )}
                     {visible.map(col => (
-                      <td key={col.key} style={{ padding: "9px 14px", whiteSpace: "nowrap" }}>
-                        {cell(col.key, order, i)}
-                      </td>
+                      <th key={col.key} style={{ padding: "11px 14px", fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
+                        {col.label}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinel} style={{ padding: "12px", textAlign: "center" }}>
-            {loadingMore && <span style={{ fontSize: 11, color: "#9ca3af" }}>Loading more…</span>}
-            {!hasMore && !loading && orders.length > 0 && (
-              <span style={{ fontSize: 10, color: "#d1d5db" }}>
-                All {orders.length} orders loaded
-              </span>
-            )}
+                </thead>
+                <tbody>
+                  {orders.map((order, i) => (
+                    <tr
+                      key={order.id}
+                      style={{
+                        borderBottom: "1px solid #f9fafb",
+                        background: selected.has(order.id) ? "#f0f7f4" : "transparent",
+                        cursor: "default",
+                      }}
+                      onMouseEnter={e => {
+                        if (!selected.has(order.id))
+                          (e.currentTarget as HTMLElement).style.background = "#f9fafb";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background =
+                          selected.has(order.id) ? "#f0f7f4" : "transparent";
+                      }}
+                    >
+                      {!isAgent && (
+                        <td style={{ padding: "9px 14px" }}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(order.id)}
+                            onChange={() => toggleOne(order.id)}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </td>
+                      )}
+                      {visible.map(col => (
+                        <td key={col.key} style={{ padding: "9px 14px", whiteSpace: "nowrap" }}>
+                          {cell(col.key, order, i)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* ── TÉLÉPHONE : cartes pliables (même organisation des champs) ── */}
+          <div className="responsive-cards-mobile">
+            {orders.map((order, i) => {
+              const isOpen   = expanded.has(order.id);
+              const rec      = fmtRecall(order.recallAt);
+              const isSel    = selected.has(order.id);
+              // Champs secondaires = colonnes visibles hors entête de carte (#, produit, statut)
+              const secondaryCols = visible.filter(c => !["num", "product", "status"].includes(c.key));
+              return (
+                <div
+                  key={order.id}
+                  className="glass-card"
+                  style={{
+                    overflow: "hidden",
+                    border: rec.overdue ? "1.5px solid #ef4444" : undefined,
+                    background: isSel ? "#f0f7f4" : undefined,
+                  }}
+                >
+                  {/* En-tête (toujours visible) */}
+                  <div
+                    onClick={() => toggleExpand(order.id)}
+                    style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+                  >
+                    {!isAgent && (
+                      <input
+                        type="checkbox"
+                        checked={isSel}
+                        onClick={e => e.stopPropagation()}
+                        onChange={() => toggleOne(order.id)}
+                        style={{ cursor: "pointer", flexShrink: 0, width: 16, height: 16 }}
+                      />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        #{order.orderNumber ?? i + 1} · {order.customer}
+                      </div>
+                      {visibleCols.has("product") && (
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {order.product?.name ?? "—"}
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {rec.overdue && (
+                        <span style={{ background: "#ef4444", borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1.5s ease-in-out infinite" }}>
+                          <Bell size={11} color="white" />
+                        </span>
+                      )}
+                      {cell("status", order, i)}
+                      <button
+                        onClick={() => toggleExpand(order.id)}
+                        aria-label={isOpen ? "Réduire" : "Détails"}
+                        style={{
+                          width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                          border: "1px solid #e5e7eb",
+                          background: isOpen ? "#0d3938" : "white",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          cursor: "pointer",
+                          transform: isOpen ? "rotate(180deg)" : "none",
+                          transition: "transform .2s ease",
+                        }}
+                      >
+                        <ChevronDown size={14} color={isOpen ? "white" : "#9ca3af"} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Détails (dépliés) */}
+                  {isOpen && (
+                    <div style={{ padding: "0 14px 14px", borderTop: "1px solid #f3f4f6" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                        {secondaryCols.map(col => (
+                          <div
+                            key={col.key}
+                            style={{
+                              display: "flex", flexDirection: "column", gap: 3, minWidth: 0,
+                              gridColumn: col.key === "notes" ? "1 / -1" : undefined,
+                            }}
+                          >
+                            <span style={{ fontSize: 9, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                              {col.label}
+                            </span>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
+                              {cell(col.key, order, i)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Sentinelle scroll infini (commune aux deux affichages) */}
+      <div ref={sentinel} style={{ padding: "12px", textAlign: "center" }}>
+        {loadingMore && <span style={{ fontSize: 11, color: "#9ca3af" }}>Chargement…</span>}
+        {!hasMore && !loading && orders.length > 0 && (
+          <span style={{ fontSize: 10, color: "#d1d5db" }}>
+            {orders.length} commande{orders.length > 1 ? "s" : ""} chargée{orders.length > 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       {/* ── CONFIRM DELETE MODAL ── */}

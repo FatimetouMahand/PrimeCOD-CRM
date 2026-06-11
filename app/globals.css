@@ -40,6 +40,19 @@ table {
 }
 
 /* ───────────────────────────────────────────────────────────────
+   ORDERS / listes : tableau sur grand écran, cartes pliables sur
+   téléphone (même organisation des champs, en plus lisible — au lieu
+   d'un tableau large qui défile horizontalement).
+─────────────────────────────────────────────────────────────── */
+.responsive-table-desktop { display: block; }
+.responsive-cards-mobile  { display: none; }
+
+@media (max-width: 767px) {
+  .responsive-table-desktop { display: none !important; }
+  .responsive-cards-mobile  { display: flex !important; flex-direction: column; gap: 10px; }
+}
+
+/* ───────────────────────────────────────────────────────────────
    SIDEBAR BACKDROP (only visible on mobile when sidebar open)
 ─────────────────────────────────────────────────────────────── */
 .sidebar-backdrop {
