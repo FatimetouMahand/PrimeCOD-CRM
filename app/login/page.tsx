@@ -60,9 +60,9 @@ export default function LoginPage() {
             background: "#0d3938",
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "white", fontSize: 16, fontWeight: 900,
-          }}>P</div>
+          }}>S</div>
           <span style={{ fontSize: 18, fontWeight: 800, color: "#002322", letterSpacing: -0.3 }}>
-            PrimeCOD
+            Sou9nkc
           </span>
         </div>
 
@@ -202,7 +202,7 @@ export default function LoginPage() {
         {/* Footer */}
         <div style={{ marginTop: "auto", paddingTop: 24 }}>
           <p style={{ fontSize: 11, color: "#9d9b9a" }}>
-            © 2026 PrimeCOD Mauritanie. Tous droits réservés.
+            © 2026 Sou9nkc Mauritanie. Tous droits réservés.
           </p>
         </div>
       </section>

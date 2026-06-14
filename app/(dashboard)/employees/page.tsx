@@ -185,22 +185,20 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* STATS */}
+      {/* STATS — cartes blanches épurées (icône grise, sans pavé coloré) */}
       <div className="kpi-band" style={{ marginBottom: 12 }}>
         {[
-          { label: "Total",     value: total,     icon: <Users        size={13}/>, bg: "#beecdf" },
-          { label: "En ligne",  value: online,    icon: <CheckCircle2 size={13}/>, bg: "#dcfce7" },
-          { label: "Suspendus", value: suspended, icon: <UserX        size={13}/>, bg: "#fee2e2" },
-          { label: "Agents",    value: agents,    icon: <ShieldCheck  size={13}/>, bg: "#dbeafe" },
+          { label: "Total",     value: total,     icon: <Users        size={15}/> },
+          { label: "En ligne",  value: online,    icon: <CheckCircle2 size={15}/> },
+          { label: "Suspendus", value: suspended, icon: <UserX        size={15}/> },
+          { label: "Agents",    value: agents,    icon: <ShieldCheck  size={15}/> },
         ].map(s => (
-          <div key={s.label} className="glass-card">
-            <div style={{ padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <p style={{ fontSize: 9, color: "#6b7280", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: 700 }}>{s.label}</p>
-                <h2 style={{ fontSize: 16, fontWeight: 800 }}>{s.value}</h2>
-              </div>
-              <div style={{ width: 28, height: 28, borderRadius: 9, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.icon}</div>
+          <div key={s.label} style={{ background: "white", borderRadius: 12, border: "1px solid #edf0f5", padding: "11px 13px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+              <p style={{ fontSize: 9, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>{s.label}</p>
+              <span style={{ color: "#cbd5e1", display: "flex", flexShrink: 0 }}>{s.icon}</span>
             </div>
+            <h2 style={{ fontSize: 19, fontWeight: 800, color: "#111827", lineHeight: 1 }}>{s.value}</h2>
           </div>
         ))}
       </div>

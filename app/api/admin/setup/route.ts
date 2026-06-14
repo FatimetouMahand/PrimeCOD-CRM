@@ -283,7 +283,7 @@ export async function GET(request: Request) {
       const encrypted = encrypt("primecod123");
       await prisma.user.create({
         data: {
-          name:              "Admin PrimeCOD",
+          name:              "Admin Sou9nkc",
           phone:             "00000000",
           password:          hashed,
           encryptedPassword: encrypted,

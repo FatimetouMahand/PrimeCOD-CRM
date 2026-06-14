@@ -345,7 +345,7 @@ function ShopifyTab() {
       {/* OAuth connect — recommended, 1-click */}
       <Card
         title="Connecter une boutique Shopify"
-        subtitle="Méthode recommandée : autorise l'app PrimeCOD CRM en un clic, le token est récupéré automatiquement"
+        subtitle="Méthode recommandée : autorise l'app Sou9nkc en un clic, le token est récupéré automatiquement"
       >
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input
@@ -582,7 +582,7 @@ export default function SettingsPage() {
       <div style={{ marginBottom: 14 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0 }}>Paramètres</h1>
         <p style={{ fontSize: 11, color: "#9ca3af", margin: "3px 0 0" }}>
-          Configuration du système PrimeCOD
+          Configuration du système Sou9nkc
         </p>
       </div>
 

@@ -37,6 +37,12 @@ export async function GET() {
       return res;
     }
 
+    // Renommage ponctuel : l'admin créé sous l'ancien nom devient "Admin Sou9nkc"
+    if (user.role === "ADMIN" && user.name === "Admin PrimeCOD") {
+      await prisma.user.update({ where: { id: user.id }, data: { name: "Admin Sou9nkc" } }).catch(() => {});
+      user.name = "Admin Sou9nkc";
+    }
+
     // Heartbeat
     await prisma.user.update({
       where: { id: user.id },

@@ -120,8 +120,8 @@ function Shell({ children }: { children: React.ReactNode }) {
                 background: "linear-gradient(135deg,#3c665c,#0d3938)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "white", fontSize: 14, fontWeight: 900,
-              }}>P</span>
-              <span>PrimeCOD</span>
+              }}>S</span>
+              <span>Sou9nkc</span>
             </div>
             {isMobile && (
               <button

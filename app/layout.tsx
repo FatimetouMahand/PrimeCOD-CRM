@@ -2,8 +2,8 @@ import "./globals.css";
 import type { Viewport } from "next";
 
 export const metadata = {
-  title: "PrimeCOD CRM",
-  description: "Shopify CRM Dashboard",
+  title: "Sou9nkc",
+  description: "Sou9nkc — CRM & Analytics",
 };
 
 export const viewport: Viewport = {
