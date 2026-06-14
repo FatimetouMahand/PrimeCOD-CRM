@@ -146,10 +146,12 @@ export default function OrdersPage() {
   const isAgent = user?.role === "AGENT" || user?.role === "AGENT_TEST";
 
   // ── Fetch orders ──────────────────────────────────────────────────────
+  // `silent` : recharge en arrière-plan sans afficher le "Chargement…"
+  // (utilisé par l'auto-actualisation non intrusive).
   const load = useCallback(async (opts: {
-    cursor?: string; search?: string; statusId?: string; productId?: string; date?: string; dateTo?: string; append?: boolean;
+    cursor?: string; search?: string; statusId?: string; productId?: string; date?: string; dateTo?: string; append?: boolean; silent?: boolean;
   } = {}) => {
-    const { cursor, search: q = "", statusId = "", productId = "", date = "", dateTo = "", append = false } = opts;
+    const { cursor, search: q = "", statusId = "", productId = "", date = "", dateTo = "", append = false, silent = false } = opts;
     const p = new URLSearchParams();
     if (cursor)    p.set("cursor",    cursor);
     if (q)         p.set("search",    q);
@@ -157,7 +159,7 @@ export default function OrdersPage() {
     if (productId) p.set("productId", productId);
     if (date)      { p.set("dateFrom", date); p.set("dateTo", dateTo || date); }
 
-    append ? setLoadingMore(true) : setLoading(true);
+    if (!silent) { append ? setLoadingMore(true) : setLoading(true); }
     try {
       const res  = await fetch(`/api/orders?${p}`);
       const data = await res.json();
@@ -166,7 +168,7 @@ export default function OrdersPage() {
       setHasMore(!!data.nextCursor);
       if (data.stats) setStats(data.stats);
     } finally {
-      append ? setLoadingMore(false) : setLoading(false);
+      if (!silent) { append ? setLoadingMore(false) : setLoading(false); }
     }
   }, []);
 
@@ -195,6 +197,24 @@ export default function OrdersPage() {
     obs.observe(sentinel.current);
     return () => obs.disconnect();
   }, [hasMore, loadingMore, nextCursor, search, filterStatus, filterProduct, filterDate, filterDateTo, load]);
+
+  // ── Auto-actualisation NON intrusive (récupère les nouvelles commandes
+  //    Shopify toutes les 60s) ───────────────────────────────────────────
+  // Contrairement à l'ancien app, on ne ramène JAMAIS l'admin en arrière de
+  // force : on ne recharge en silence que s'il est en haut de la liste et ne
+  // cherche/filtre rien. S'il consulte d'anciennes commandes ou fait une
+  // recherche, on ne touche à rien (il reprendra au prochain retour en haut).
+  useEffect(() => {
+    const id = setInterval(() => {
+      const atTop    = typeof window !== "undefined" && window.scrollY < 150;
+      const browsing = !!search || !!filterStatus || !!filterProduct;
+      const loadingNow = loading || loadingMore;
+      if (atTop && !browsing && !loadingNow) {
+        load({ statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo, silent: true });
+      }
+    }, 60000);
+    return () => clearInterval(id);
+  }, [load, search, filterStatus, filterProduct, filterDate, filterDateTo, loading, loadingMore]);
 
   // ── Search (debounced 400ms) ──────────────────────────────────────────
   const handleSearch = (val: string) => {

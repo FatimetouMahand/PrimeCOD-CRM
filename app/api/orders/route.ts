@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { verifyToken } from "@/lib/auth/jwt";
 import { cookies } from "next/headers";
 
-const LIMIT = 30;
+const LIMIT = 50;
 
 // Get caller identity from cookie
 async function getCaller() {

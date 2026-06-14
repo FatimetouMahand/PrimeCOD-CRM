@@ -21,6 +21,13 @@ const NAV_ADMIN = [
   { href: "/settings",   label: "Paramètres",  Icon: Settings },
 ];
 
+const NAV_SUPERVISOR = [
+  { href: "/dashboard", label: "Dashboard",  Icon: LayoutDashboard },
+  { href: "/orders",    label: "Commandes",  Icon: ShoppingCart },
+  { href: "/products",  label: "Produits",   Icon: Package },
+  { href: "/statuses",  label: "Statuts",    Icon: Tag },
+];
+
 const NAV_AGENT = [
   { href: "/dashboard", label: "Mon Dashboard", Icon: LayoutDashboard },
   { href: "/orders",    label: "Mes Commandes",  Icon: ShoppingCart },
@@ -71,7 +78,10 @@ function Shell({ children }: { children: React.ReactNode }) {
     if (!ok) router.replace("/dashboard");
   }, [user, pathname, router]);
 
-  const navItems = (user?.role === "AGENT" || user?.role === "AGENT_TEST") ? NAV_AGENT : NAV_ADMIN;
+  const navItems =
+    user?.role === "ADMIN"      ? NAV_ADMIN :
+    user?.role === "SUPERVISOR" ? NAV_SUPERVISOR :
+    NAV_AGENT;
 
   // Sidebar width logic:
   // - Mobile: always 240px when open (overlay), 0 when closed
