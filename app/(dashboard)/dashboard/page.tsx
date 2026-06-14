@@ -574,94 +574,23 @@ export default function DashboardPage() {
           <div
             key={item.title}
             style={{
-              background: item.bg,
-              borderRadius: 14,
-              border: "1px solid rgba(0,0,0,0.04)",
+              background: "white",
+              borderRadius: 12,
+              border: "1px solid #edf0f5",
+              padding: "11px 13px",
             }}
           >
-            <div
-              style={{
-                padding: "11px 13px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent:
-                    "space-between",
-                  alignItems:
-                    "flex-start",
-                }}
-              >
-                <div>
-                  <p
-                    style={{
-                      fontSize:
-                        "9px",
-                      color:
-                        "#374151",
-                      marginBottom:
-                        "3px",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.03em",
-                      fontWeight: 800,
-                      opacity: 0.75,
-                    }}
-                  >
-                    {item.title}
-                  </p>
-
-                  <h2
-                    style={{
-                      fontSize:
-                        "18px",
-                      fontWeight:
-                        "800",
-                      color: "#111827",
-                      lineHeight: 1.1,
-                    }}
-                  >
-                    {item.value}
-                  </h2>
-
-                  {item.sub && (
-                    <p
-                      style={{
-                        fontSize: "10px",
-                        color: "#374151",
-                        opacity: 0.7,
-                        marginTop: "3px",
-                      }}
-                    >
-                      {item.sub}
-                    </p>
-                  )}
-
-                  <GrowthBadge value={item.growth} points={item.points} />
-                </div>
-
-                <div
-                  style={{
-                    width: "30px",
-                    height: "30px",
-                    borderRadius:
-                      "10px",
-                    background:
-                      "rgba(255,255,255,0.55)",
-                    color: "#111827",
-                    display:
-                      "flex",
-                    alignItems:
-                      "center",
-                    justifyContent:
-                      "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  {item.icon}
-                </div>
-              </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+              <p style={{ fontSize: 9, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>
+                {item.title}
+              </p>
+              <span style={{ color: "#cbd5e1", display: "flex", flexShrink: 0 }}>{item.icon}</span>
             </div>
+            <h2 style={{ fontSize: 19, fontWeight: 800, color: "#111827", lineHeight: 1 }}>{item.value}</h2>
+            {item.sub && (
+              <p style={{ fontSize: 10, color: "#9ca3af", marginTop: 3 }}>{item.sub}</p>
+            )}
+            <GrowthBadge value={item.growth} points={item.points} />
           </div>
         ))}
       </div>
@@ -1246,128 +1175,65 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ORDERS */}
+      {/* COMMANDES RÉCENTES — tableau (PC) + liste (téléphone) */}
 
       <div className="glass-card">
-        <div
-          style={{
-            padding: "14px",
-            overflowX: "auto",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "13px",
-              fontWeight: "700",
-              marginBottom: "12px",
-            }}
-          >
+        <div style={{ padding: "14px" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px" }}>
             Commandes récentes
           </h2>
 
-          <table
-            style={{
-              width: "100%",
-              borderCollapse:
-                "collapse",
-              fontSize: "11px",
-            }}
-          >
-            <thead>
-              <tr
-                style={{
-                  textAlign: "left",
-                  borderBottom:
-                    "1px solid #e5e7eb",
-                }}
-              >
-                <th style={{ paddingBottom: "10px" }}>Client</th>
-                <th style={{ paddingBottom: "10px" }}>Produit</th>
-                <th style={{ paddingBottom: "10px" }}>Ville</th>
-                <th style={{ paddingBottom: "10px" }}>Statut</th>
-                <th style={{ paddingBottom: "10px" }}>Montant</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {data.recentOrders
-                ?.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={5}
-                    style={{
-                      padding:
-                        "14px 0",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    Aucune commande
-                  </td>
-                </tr>
-              ) : (
-                data.recentOrders.map(
-                  (order) => (
-                    <tr
-                      key={order.id}
-                      style={{
-                        borderBottom:
-                          "1px solid #f3f4f6",
-                      }}
-                    >
-                      <td
-                        style={{
-                          padding:
-                            "11px 0",
-                        }}
-                      >
-                        {
-                          order.customer
-                        }
-                      </td>
-
-                      <td>
-                        {
-                          order.product
-                        }
-                      </td>
-
-                      <td>
-                        {order.city}
-                      </td>
-
-                      <td>
-                        <span
-                          style={{
-                            padding:
-                              "4px 10px",
-                            borderRadius:
-                              "999px",
-                            fontSize:
-                              "10px",
-                            fontWeight:
-                              "700",
-                            background: "#f3f4f6",
-                            color: "#374151",
-                          }}
-                        >
-                          {
-                            order.status
-                          }
-                        </span>
-                      </td>
-
-                      <td>
-                        {
-                          order.amount
-                        }{" "}
-                        MRU
-                      </td>
+          {data.recentOrders?.length === 0 ? (
+            <p style={{ fontSize: 11, color: "#9ca3af", padding: "8px 0" }}>Aucune commande</p>
+          ) : (
+            <>
+              {/* PC : tableau */}
+              <div className="responsive-table-desktop" style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                  <thead>
+                    <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
+                      <th style={{ paddingBottom: "10px" }}>Client</th>
+                      <th style={{ paddingBottom: "10px" }}>Produit</th>
+                      <th style={{ paddingBottom: "10px" }}>Ville</th>
+                      <th style={{ paddingBottom: "10px" }}>Statut</th>
+                      <th style={{ paddingBottom: "10px" }}>Montant</th>
                     </tr>
-                  )
-                )
-              )}
-            </tbody>
-          </table>
+                  </thead>
+                  <tbody>
+                    {data.recentOrders.map((order) => (
+                      <tr key={order.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <td style={{ padding: "11px 0" }}>{order.customer}</td>
+                        <td>{order.product}</td>
+                        <td>{order.city}</td>
+                        <td>
+                          <span style={{ padding: "4px 10px", borderRadius: "999px", fontSize: "10px", fontWeight: "700", background: "#f3f4f6", color: "#374151" }}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td>{order.amount} MRU</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Téléphone : liste compacte */}
+              <div className="responsive-cards-mobile" style={{ gap: 0 }}>
+                {data.recentOrders.map((order) => (
+                  <div key={order.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{order.customer}</div>
+                      <div style={{ fontSize: 10, color: "#9ca3af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{order.product} · {order.city}</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{order.amount} MRU</div>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: "#6b7280" }}>{order.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
