@@ -538,7 +538,7 @@ export default function DashboardPage() {
               growth: data.confirmationRateGrowth,
               points: true,
               icon: <Percent size={15} />,
-              bg: "#dcfce7",
+              bg: "#fef3c7",
             },
             {
               title: "Commandes traitées",
@@ -546,7 +546,7 @@ export default function DashboardPage() {
               growth: data.processedGrowth,
               sub: `${data.processedRevenue.toLocaleString("fr-FR")} MRU`,
               icon: <CheckCircle2 size={15} />,
-              bg: "#dcfce7",
+              bg: "#dbeafe",
             },
             {
               title: "En attente",
@@ -554,7 +554,7 @@ export default function DashboardPage() {
               growth: data.pendingGrowth,
               sub: `${(data.revenue - data.processedRevenue).toLocaleString("fr-FR")} MRU`,
               icon: <Clock3 size={15} />,
-              bg: "#fef3c7",
+              bg: "#ffedd5",
             },
             {
               title: "À rappeler",
@@ -567,17 +567,21 @@ export default function DashboardPage() {
               value: fmtMinutes(data.avgProcessingTimeMin),
               growth: data.avgProcessingGrowth,
               icon: <Timer size={15} />,
-              bg: "#e0e7ff",
+              bg: "#ede9fe",
             },
           ] as StatCard[]
         ).map((item) => (
           <div
             key={item.title}
-            className="glass-card"
+            style={{
+              background: item.bg,
+              borderRadius: 14,
+              border: "1px solid rgba(0,0,0,0.04)",
+            }}
           >
             <div
               style={{
-                padding: "10px 12px",
+                padding: "11px 13px",
               }}
             >
               <div
@@ -586,7 +590,7 @@ export default function DashboardPage() {
                   justifyContent:
                     "space-between",
                   alignItems:
-                    "center",
+                    "flex-start",
                 }}
               >
                 <div>
@@ -595,12 +599,13 @@ export default function DashboardPage() {
                       fontSize:
                         "9px",
                       color:
-                        "#6b7280",
+                        "#374151",
                       marginBottom:
                         "3px",
                       textTransform: "uppercase",
                       letterSpacing: "0.03em",
-                      fontWeight: 700,
+                      fontWeight: 800,
+                      opacity: 0.75,
                     }}
                   >
                     {item.title}
@@ -609,9 +614,11 @@ export default function DashboardPage() {
                   <h2
                     style={{
                       fontSize:
-                        "17px",
+                        "18px",
                       fontWeight:
                         "800",
+                      color: "#111827",
+                      lineHeight: 1.1,
                     }}
                   >
                     {item.value}
@@ -621,8 +628,9 @@ export default function DashboardPage() {
                     <p
                       style={{
                         fontSize: "10px",
-                        color: "#6b7280",
-                        marginTop: "4px",
+                        color: "#374151",
+                        opacity: 0.7,
+                        marginTop: "3px",
                       }}
                     >
                       {item.sub}
@@ -639,7 +647,8 @@ export default function DashboardPage() {
                     borderRadius:
                       "10px",
                     background:
-                      item.bg,
+                      "rgba(255,255,255,0.55)",
+                    color: "#111827",
                     display:
                       "flex",
                     alignItems:

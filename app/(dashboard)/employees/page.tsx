@@ -660,19 +660,49 @@ function ViewPwdModal({ emp, onClose }: { emp: Employee; onClose: () => void }) 
 }
 
 // ══ Permissions section ════════════════════════════════════════════════════════
+// Les permissions affichées dépendent du rôle choisi (comme l'ancien app) :
+// un Agent ne voit que les permissions de commandes ; un Superviseur voit en
+// plus Produits, Statuts et Reporting (séparés par sections).
 function PermsSection({ perms, role, onToggle }: { perms: Record<PermKey, boolean>; role: string; onToggle: (k: PermKey) => void }) {
+  const isSupervisor = role === "SUPERVISOR";
+  const labelOf = (k: PermKey) => ALL_PERMISSIONS.find(p => p.key === k)?.label ?? k;
+
+  const groups: { title?: string; keys: PermKey[] }[] = [
+    { keys: ["canViewDashboard", "canViewOrders", "canEditOrders"] },
+    ...(isSupervisor
+      ? [
+          { title: "Produits",  keys: ["canViewProducts", "canEditProducts"] as PermKey[] },
+          { title: "Statuts",   keys: ["canViewStatuses", "canEditStatuses"] as PermKey[] },
+          { title: "Reporting", keys: ["canViewReporting"] as PermKey[] },
+        ]
+      : []),
+  ];
+
+  const PermCheck = ({ k }: { k: PermKey }) => (
+    <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11, cursor: "pointer", padding: "5px 8px", borderRadius: 7, background: perms[k] ? "#dbeafe" : "#f9fafb", border: `1px solid ${perms[k] ? "#93c5fd" : "#e5e7eb"}` }}>
+      <input type="checkbox" checked={perms[k]} onChange={() => onToggle(k)} style={{ cursor: "pointer" }} />
+      {labelOf(k)}
+    </label>
+  );
+
   return (
     <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
         <ShieldAlert size={14} color="#2563eb" />
         <span style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8" }}>Permissions — {ROLE_LABELS[role] ?? role}</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        {ALL_PERMISSIONS.map(p => (
-          <label key={p.key} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11, cursor: "pointer", padding: "5px 8px", borderRadius: 7, background: perms[p.key] ? "#dbeafe" : "#f9fafb", border: `1px solid ${perms[p.key] ? "#93c5fd" : "#e5e7eb"}` }}>
-            <input type="checkbox" checked={perms[p.key]} onChange={() => onToggle(p.key)} style={{ cursor: "pointer" }} />
-            {p.label}
-          </label>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {groups.map((g, gi) => (
+          <div key={gi} style={gi > 0 ? { borderTop: "1px solid #e5e7eb", paddingTop: 10 } : undefined}>
+            {g.title && (
+              <div style={{ fontSize: 9, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                {g.title}
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {g.keys.map(k => <PermCheck key={k} k={k} />)}
+            </div>
+          </div>
         ))}
       </div>
     </div>

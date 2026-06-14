@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, Check, Bell, BellOff, Power, ListChecks, CheckCircle2, Flag } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, Bell, BellOff, Power, ListChecks, CheckCircle2, Flag, Repeat } from "lucide-react";
 
 interface Status {
   id: string;
@@ -10,6 +10,7 @@ interface Status {
   isActive: boolean;
   isFinal: boolean;
   alertAfterHours: number | null;
+  repeatCount: number | null;
   createdAt: string;
 }
 
@@ -35,9 +36,11 @@ export default function StatusesPage() {
   const [name,    setName]    = useState("");
   const [color,   setColor]   = useState("#0d3938");
   const [hours,   setHours]   = useState("");
+  const [repeat,  setRepeat]  = useState("");
   const [isFinal, setIsFinal] = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState("");
+  const [showColorMenu, setShowColorMenu] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -51,8 +54,8 @@ export default function StatusesPage() {
   useEffect(() => { load(); }, [load]);
 
   const resetForm = () => {
-    setName(""); setColor("#0d3938"); setHours(""); setIsFinal(false); setErr("");
-    setShowForm(false); setEditId(null);
+    setName(""); setColor("#0d3938"); setHours(""); setRepeat(""); setIsFinal(false); setErr("");
+    setShowForm(false); setEditId(null); setShowColorMenu(false);
   };
 
   const openAdd = () => {
@@ -63,6 +66,7 @@ export default function StatusesPage() {
     setName(s.name);
     setColor(s.color);
     setHours(s.alertAfterHours ? String(s.alertAfterHours) : "");
+    setRepeat(s.repeatCount ? String(s.repeatCount) : "");
     setIsFinal(s.isFinal);
     setErr("");
     setEditId(s.id);
@@ -73,7 +77,7 @@ export default function StatusesPage() {
     setErr("");
     if (!name.trim()) { setErr("Le nom est requis"); return; }
     setSaving(true);
-    const body = { name: name.trim(), color, isFinal, alertAfterHours: hours ? Number(hours) : null };
+    const body = { name: name.trim(), color, isFinal, alertAfterHours: hours ? Number(hours) : null, repeatCount: repeat ? Number(repeat) : null };
     const url    = editId ? `/api/statuses/${editId}` : "/api/statuses";
     const method = editId ? "PATCH" : "POST";
     const res = await fetch(url, {
@@ -181,35 +185,62 @@ export default function StatusesPage() {
             />
           </div>
 
-          {/* Color picker */}
+          {/* Color picker — carré cliquable qui ouvre une palette de petits carrés */}
           <div style={{ marginBottom: 14 }}>
             <label style={LS}>Couleur</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              {PRESET_COLORS.map(c => (
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <div style={{ position: "relative" }}>
                 <button
-                  key={c}
-                  onClick={() => setColor(c)}
+                  type="button"
+                  onClick={() => setShowColorMenu(v => !v)}
+                  title="Choisir une couleur"
                   style={{
-                    width: 28, height: 28, borderRadius: "50%", border: "none",
-                    background: c, cursor: "pointer",
-                    outline: color === c ? `3px solid ${c}` : "none",
-                    outlineOffset: 2,
-                    transform: color === c ? "scale(1.15)" : "scale(1)",
-                    transition: "transform 0.1s",
+                    width: 40, height: 40, borderRadius: 10, cursor: "pointer", padding: 0,
+                    background: color, border: "3px solid white",
+                    boxShadow: "0 0 0 1.5px #e5e7eb",
                   }}
                 />
-              ))}
-              <input
-                type="color"
-                value={color}
-                onChange={e => setColor(e.target.value)}
-                style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #e5e7eb", cursor: "pointer", padding: 2 }}
-                title="Couleur personnalisée"
-              />
+                {showColorMenu && (
+                  <>
+                    <div onClick={() => setShowColorMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                    <div style={{
+                      position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
+                      background: "white", border: "1px solid #e5e7eb", borderRadius: 12,
+                      padding: 10, boxShadow: "0 12px 30px rgba(0,0,0,0.12)", width: 200,
+                    }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 6 }}>
+                        {PRESET_COLORS.map(c => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => { setColor(c); setShowColorMenu(false); }}
+                            title={c}
+                            style={{
+                              width: 24, height: 24, borderRadius: 6, cursor: "pointer", padding: 0,
+                              background: c,
+                              border: color === c ? "2px solid #111827" : "1px solid #e5e7eb",
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 8 }}>
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={e => setColor(e.target.value)}
+                          style={{ width: 30, height: 30, borderRadius: 6, border: "1px solid #e5e7eb", cursor: "pointer", padding: 2 }}
+                        />
+                        <span style={{ fontSize: 11, color: "#6b7280" }}>Couleur personnalisée</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
               {/* Preview badge */}
               <span style={{
-                marginLeft: 8, padding: "3px 12px", borderRadius: 999,
-                background: color + "22", color, fontSize: 11, fontWeight: 700,
+                padding: "4px 14px", borderRadius: 999,
+                background: color + "22", color, fontSize: 12, fontWeight: 700,
               }}>
                 {name || "Aperçu"}
               </span>
@@ -233,6 +264,27 @@ export default function StatusesPage() {
               />
               <span style={{ fontSize: 11, color: "#6b7280" }}>
                 {hours ? `Rappel après ${hours}h sans action` : "Pas d'alerte automatique"}
+              </span>
+            </div>
+          </div>
+
+          {/* Repeat count — combien de fois ce statut doit être rappelé */}
+          <div style={{ marginBottom: 18 }}>
+            <label style={LS}>
+              <Repeat size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
+              Nombre de répétitions — optionnel
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input
+                type="number"
+                min={1}
+                value={repeat}
+                onChange={e => setRepeat(e.target.value)}
+                placeholder="Ex: 3"
+                style={{ ...IS, width: 100 }}
+              />
+              <span style={{ fontSize: 11, color: "#6b7280" }}>
+                {repeat ? `Ce statut sera rappelé ${repeat} fois maximum` : "Pas de répétition définie"}
               </span>
             </div>
           </div>
@@ -434,6 +486,13 @@ function StatusRow({
           ✓ FINAL
         </span>
       )}
+
+      {/* Repeat count badge */}
+      {s.repeatCount ? (
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#6b7280", fontWeight: 600 }}>
+          <Repeat size={10} /> ×{s.repeatCount}
+        </span>
+      ) : null}
 
       {/* isActive badge + actions (poussés à droite, s'enroulent sur mobile) */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>

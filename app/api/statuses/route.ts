@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
+// Auto-migration : ajoute la colonne repeatCount si elle n'existe pas encore
+// (le build de prod ne lance pas `prisma migrate`). Idempotent, sans risque.
+async function ensureRepeatCountColumn() {
+  try {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "Status" ADD COLUMN IF NOT EXISTS "repeatCount" INTEGER'
+    );
+  } catch {
+    // Colonne déjà présente ou base indisponible — on ignore
+  }
+}
+
 export async function GET() {
   try {
+    await ensureRepeatCountColumn();
     // Les statuts supprimés (isArchived) n'apparaissent plus dans les choix
     // (filtres, changement de statut…) mais restent en base : les anciennes
     // commandes qui pointent encore dessus conservent leur étiquette.
@@ -18,7 +31,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name, color, alertAfterHours, isFinal } = await request.json();
+    await ensureRepeatCountColumn();
+    const { name, color, alertAfterHours, isFinal, repeatCount } = await request.json();
     if (!name || !color) {
       return NextResponse.json({ error: "Nom et couleur requis" }, { status: 400 });
     }
@@ -28,6 +42,7 @@ export async function POST(request: Request) {
         color,
         isFinal: Boolean(isFinal),
         alertAfterHours: alertAfterHours ? Number(alertAfterHours) : null,
+        repeatCount: repeatCount ? Number(repeatCount) : null,
       },
     });
     return NextResponse.json({ status }, { status: 201 });

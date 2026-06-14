@@ -19,6 +19,9 @@ export async function PATCH(
         ...(body.alertAfterHours !== undefined && {
           alertAfterHours: body.alertAfterHours ? Number(body.alertAfterHours) : null,
         }),
+        ...(body.repeatCount !== undefined && {
+          repeatCount: body.repeatCount ? Number(body.repeatCount) : null,
+        }),
       },
     });
     return NextResponse.json({ status });

@@ -105,6 +105,7 @@ model Status {
   isFinal         Boolean  @default(false)   // true = commande terminée (Confirmée, Rejetée…)
   isArchived      Boolean  @default(false)   // Supprimé logiquement — conservé sur anciennes commandes
   alertAfterHours Int?                       // Déclencher rappel après X heures
+  repeatCount     Int?                       // Nb de fois où ce statut doit être rappelé/répété (optionnel)
   createdAt       DateTime @default(now())
 
   orders Order[]
