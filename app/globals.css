@@ -53,6 +53,31 @@ table {
 }
 
 /* ───────────────────────────────────────────────────────────────
+   KPI : grille sur grand écran, BANDE qui défile horizontalement sur
+   téléphone (style widgets, pour ne pas occuper toute la hauteur).
+─────────────────────────────────────────────────────────────── */
+.kpi-band {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 767px) {
+  .kpi-band {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 6px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .kpi-band > * {
+    flex: 0 0 47%;
+    scroll-snap-align: start;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
    SIDEBAR BACKDROP (only visible on mobile when sidebar open)
 ─────────────────────────────────────────────────────────────── */
 .sidebar-backdrop {

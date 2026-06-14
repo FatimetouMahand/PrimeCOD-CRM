@@ -508,13 +508,8 @@ export default function DashboardPage() {
       {/* STATS */}
 
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit,minmax(148px,1fr))",
-          gap: "8px",
-          marginBottom: "14px",
-        }}
+        className="kpi-band"
+        style={{ marginBottom: "14px" }}
       >
         {(
           [
