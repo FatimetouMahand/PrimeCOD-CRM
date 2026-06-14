@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   UserPlus, Trash2, Edit2, Search, Users, CheckCircle2, UserX,
   ShieldCheck, X, Eye, EyeOff, Key, Send, LogOut,
-  ShieldAlert, Calendar, Clock, ChevronDown,
+  ShieldAlert, Calendar, Clock, ChevronRight,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -113,10 +113,7 @@ export default function EmployeesPage() {
   const [pwdTarget,  setPwdTarget]  = useState<Employee | null>(null);
   const [viewPwdTarget, setViewPwdTarget] = useState<Employee | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
-  const [expanded,   setExpanded]   = useState<Set<string>>(new Set()); // cartes dépliées (mobile)
-
-  const toggleExpand = (id: string) =>
-    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const [detailTarget, setDetailTarget] = useState<Employee | null>(null); // fenêtre détails (mobile)
 
   const load = useCallback(async (f = filter) => {
     setLoading(true);
@@ -331,67 +328,27 @@ export default function EmployeesPage() {
             </div>
           </div>
 
-          {/* ── TÉLÉPHONE : cartes pliables ── */}
+          {/* ── TÉLÉPHONE : cartes (clic → fenêtre détails par-dessus la page) ── */}
           <div className="responsive-cards-mobile">
-            {displayed.map(emp => {
-              const isOpen = expanded.has(emp.id);
-              return (
-                <div key={emp.id} className="glass-card" style={{ overflow: "hidden", opacity: emp.isActive ? 1 : 0.75, background: selected.has(emp.id) ? "#f0f7f4" : undefined }}>
-                  {/* En-tête */}
-                  <div onClick={() => toggleExpand(emp.id)} style={{ padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                    <input type="checkbox" checked={selected.has(emp.id)} onClick={e => e.stopPropagation()} onChange={() => toggleOne(emp.id)} style={{ cursor: "pointer", flexShrink: 0, width: 16, height: 16 }} />
-                    <div style={{ position: "relative", flexShrink: 0 }}>
-                      <Avatar name={emp.name} color={emp.iconColor} />
-                      <span style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#d1d5db", border: "2px solid white" }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.name || "—"}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "monospace" }}>{emp.phone}</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                      <RoleBadge role={emp.role} />
-                      <button onClick={() => toggleExpand(emp.id)} aria-label={isOpen ? "Réduire" : "Détails"}
-                        style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, border: "1px solid #e5e7eb", background: isOpen ? "#0d3938" : "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s ease" }}>
-                        <ChevronDown size={14} color={isOpen ? "white" : "#9ca3af"} />
-                      </button>
-                    </div>
+            {displayed.map(emp => (
+              <div key={emp.id} className="glass-card" style={{ overflow: "hidden", opacity: emp.isActive ? 1 : 0.75, background: selected.has(emp.id) ? "#f0f7f4" : undefined }}>
+                <div onClick={() => setDetailTarget(emp)} style={{ padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input type="checkbox" checked={selected.has(emp.id)} onClick={e => e.stopPropagation()} onChange={() => toggleOne(emp.id)} style={{ cursor: "pointer", flexShrink: 0, width: 16, height: 16 }} />
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <Avatar name={emp.name} color={emp.iconColor} />
+                    <span style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#d1d5db", border: "2px solid white" }} />
                   </div>
-
-                  {/* Détails */}
-                  {isOpen && (
-                    <div style={{ padding: "0 13px 13px", borderTop: "1px solid #f3f4f6" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                        <CardField label="Compte">
-                          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                            <AccountToggle active={emp.isActive} onToggle={() => toggleSuspend(emp)} />
-                            <span style={{ fontSize: 11, fontWeight: 700, color: emp.isActive ? "#16a34a" : "#9ca3af" }}>{emp.isActive ? "Actif" : "Suspendu"}</span>
-                          </div>
-                        </CardField>
-                        <CardField label="Connexion">
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: emp.status === "ONLINE" ? "#16a34a" : "#6b7280" }}>
-                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#9ca3af" }} />
-                            {emp.status === "ONLINE" ? "En ligne" : "Hors ligne"}
-                          </span>
-                        </CardField>
-                        <CardField label="Début">{emp.startDate ? fmtDate(emp.startDate) : "—"}</CardField>
-                        <CardField label="Dernière conn.">{emp.lastLogin ? fmtDateTime(emp.lastLogin) : "Jamais"}</CardField>
-                        <CardField label="Commandes">{emp.orderCount}</CardField>
-                        <CardField label="Paiement">{emp.paymentDefaultDays > 0 ? `${emp.paymentRemainingDays}j / ${emp.paymentDefaultDays}j` : "—"}</CardField>
-                        <CardField label="Telegram">{emp.telegramChatId ? "Lié" : "—"}</CardField>
-                      </div>
-                      <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
-                        <ActionBtn icon={<Edit2 size={12} color="#6b7280" />} title="Modifier"             onClick={() => setEditTarget(emp)} />
-                        <ActionBtn icon={<Key   size={12} color="#6b7280" />} title="Changer mot de passe" onClick={() => setPwdTarget(emp)} />
-                        <ActionBtn icon={<Eye   size={12} color="#2563eb" />} title="Voir mot de passe"    onClick={() => setViewPwdTarget(emp)} bg="#dbeafe" />
-                        {emp.status === "ONLINE" && (
-                          <ActionBtn icon={<LogOut size={11} color="#ef4444" />} title="Déconnecter à distance" onClick={() => forceLogout(emp)} bg="#fee2e2" />
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.name || "—"}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "monospace" }}>{emp.phone}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+                    <RoleBadge role={emp.role} />
+                    <ChevronRight size={16} color="#9ca3af" />
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -401,6 +358,60 @@ export default function EmployeesPage() {
       {editTarget       && <EditModal   emp={editTarget}                     onClose={() => setEditTarget(null)} onUpdated={u => { setEmployees(prev => prev.map(e => e.id === u.id ? u : e)); setEditTarget(null); }} />}
       {pwdTarget        && <PwdModal    emp={pwdTarget}                      onClose={() => setPwdTarget(null)} />}
       {viewPwdTarget    && <ViewPwdModal emp={viewPwdTarget}                 onClose={() => setViewPwdTarget(null)} />}
+
+      {/* FENÊTRE DÉTAILS (clic sur une carte employé — overlay, page visible derrière) */}
+      {detailTarget && (() => {
+        const emp = detailTarget;
+        return (
+          <div style={overlayStyle} onClick={() => setDetailTarget(null)}>
+            <div className="glass-card" style={{ padding: 20, width: 380, maxWidth: "calc(100vw - 24px)", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <Avatar name={emp.name} color={emp.iconColor} />
+                  <span style={{ position: "absolute", bottom: 0, right: 0, width: 9, height: 9, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#d1d5db", border: "2px solid white" }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{emp.name || "—"}</div>
+                  <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "monospace" }}>{emp.phone}</div>
+                </div>
+                <RoleBadge role={emp.role} />
+                <button onClick={() => setDetailTarget(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}><X size={16} /></button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, paddingTop: 14, borderTop: "1px solid #f3f4f6" }}>
+                <CardField label="Compte">
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <AccountToggle active={emp.isActive} onToggle={() => { toggleSuspend(emp); setDetailTarget({ ...emp, isActive: !emp.isActive }); }} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: emp.isActive ? "#16a34a" : "#9ca3af" }}>{emp.isActive ? "Actif" : "Suspendu"}</span>
+                  </div>
+                </CardField>
+                <CardField label="Connexion">
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: emp.status === "ONLINE" ? "#16a34a" : "#6b7280" }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#9ca3af" }} />
+                    {emp.status === "ONLINE" ? "En ligne" : "Hors ligne"}
+                  </span>
+                </CardField>
+                <CardField label="Début">{emp.startDate ? fmtDate(emp.startDate) : "—"}</CardField>
+                <CardField label="Dernière conn.">{emp.lastLogin ? fmtDateTime(emp.lastLogin) : "Jamais"}</CardField>
+                <CardField label="Commandes">{emp.orderCount}</CardField>
+                <CardField label="Paiement">{emp.paymentDefaultDays > 0 ? `${emp.paymentRemainingDays}j / ${emp.paymentDefaultDays}j` : "—"}</CardField>
+                <CardField label="Telegram">{emp.telegramChatId ? "Lié" : "—"}</CardField>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 18, flexWrap: "wrap" }}>
+                <button onClick={() => { setDetailTarget(null); setEditTarget(emp); }} style={{ flex: 1, minWidth: 120, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: 38, border: "none", background: "#0d3938", color: "white", borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  <Edit2 size={13} /> Modifier
+                </button>
+                <ActionBtn icon={<Key size={13} color="#6b7280" />} title="Changer mot de passe" onClick={() => { setDetailTarget(null); setPwdTarget(emp); }} />
+                <ActionBtn icon={<Eye size={13} color="#2563eb" />} title="Voir mot de passe" onClick={() => { setDetailTarget(null); setViewPwdTarget(emp); }} bg="#dbeafe" />
+                {emp.status === "ONLINE" && (
+                  <ActionBtn icon={<LogOut size={13} color="#ef4444" />} title="Déconnecter à distance" onClick={() => { forceLogout(emp); setDetailTarget({ ...emp, status: "OFFLINE" }); }} bg="#fee2e2" />
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {confirmDel && (
         <div style={overlayStyle}>
           <div className="glass-card" style={{ padding: 24, width: 300, textAlign: "center" }}>

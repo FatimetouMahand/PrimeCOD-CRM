@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   PackagePlus, Trash2, Edit2, Pencil, Search,
-  Package, ShoppingCart, Users, Shuffle, X, ChevronDown,
+  Package, ShoppingCart, Users, Shuffle, X, ChevronDown, ChevronRight,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -27,10 +27,7 @@ export default function ProductsPage() {
   const [editTarget, setEditTarget] = useState<Product | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
-  const [expanded,   setExpanded]   = useState<Set<string>>(new Set()); // cartes dépliées (mobile)
-
-  const toggleExpand = (id: string) =>
-    setExpanded(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const [detailTarget, setDetailTarget] = useState<Product | null>(null); // fenêtre détails (mobile)
 
   // ── Fetch ─────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -228,52 +225,58 @@ export default function ProductsPage() {
 
           {/* ── TÉLÉPHONE : cartes pliables ── */}
           <div className="responsive-cards-mobile">
-            {displayed.map(p => {
-              const isOpen = expanded.has(p.id);
-              return (
-                <div key={p.id} className="glass-card" style={{ overflow: "hidden", background: selected.has(p.id) ? "#f0f7f4" : undefined }}>
-                  {/* En-tête */}
-                  <div onClick={() => toggleExpand(p.id)} style={{ padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                    <input type="checkbox" checked={selected.has(p.id)} onClick={e => e.stopPropagation()} onChange={() => toggleOne(p.id)} style={{ cursor: "pointer", flexShrink: 0, width: 16, height: 16 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                      <code style={{ fontSize: 10, color: "#6b7280" }}>{p.code}</code>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                      <DistribBadge type={p.distributionType} />
-                      <button onClick={() => toggleExpand(p.id)} aria-label={isOpen ? "Réduire" : "Détails"}
-                        style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, border: "1px solid #e5e7eb", background: isOpen ? "#0d3938" : "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s ease" }}>
-                        <ChevronDown size={14} color={isOpen ? "white" : "#9ca3af"} />
-                      </button>
-                    </div>
+            {displayed.map(p => (
+              <div key={p.id} className="glass-card" style={{ overflow: "hidden", background: selected.has(p.id) ? "#f0f7f4" : undefined }}>
+                <div onClick={() => setDetailTarget(p)} style={{ padding: "11px 13px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input type="checkbox" checked={selected.has(p.id)} onClick={e => e.stopPropagation()} onChange={() => toggleOne(p.id)} style={{ cursor: "pointer", flexShrink: 0, width: 16, height: 16 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                    <code style={{ fontSize: 10, color: "#6b7280" }}>{p.code}</code>
                   </div>
-
-                  {/* Détails */}
-                  {isOpen && (
-                    <div style={{ padding: "0 13px 13px", borderTop: "1px solid #f3f4f6" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                        <CardFieldP label="Prix">{p.price > 0 ? `${p.price.toLocaleString()} MRU` : "—"}</CardFieldP>
-                        <CardFieldP label="Commandes">{p._count.orders}</CardFieldP>
-                        <div style={{ gridColumn: "1 / -1" }}><CardFieldP label="Agents assignés">{assignedBadges(p)}</CardFieldP></div>
-                        <div style={{ gridColumn: "1 / -1" }}><CardFieldP label="Masqué pour">{hiddenBadges(p)}</CardFieldP></div>
-                      </div>
-                      <div style={{ marginTop: 12 }}>
-                        <button onClick={() => setEditTarget(p)}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 5, height: 30, border: "1px solid #e5e7eb", background: "white", color: "#374151", padding: "0 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                          <Edit2 size={12} /> Modifier
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+                    <DistribBadge type={p.distributionType} />
+                    <ChevronRight size={16} color="#9ca3af" />
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </>
       )}
 
       {showAdd    && <ProductModal agents={agents} onClose={() => setShowAdd(false)} onSaved={p => { setProducts(prev => [p, ...prev]); setShowAdd(false); }} />}
       {editTarget && <ProductModal product={editTarget} agents={agents} onClose={() => setEditTarget(null)} onSaved={u => { setProducts(prev => prev.map(p => p.id === u.id ? u : p)); setEditTarget(null); }} />}
+
+      {/* FENÊTRE DÉTAILS (clic sur une carte produit — overlay, page visible derrière) */}
+      {detailTarget && (() => {
+        const p = detailTarget;
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setDetailTarget(null)}>
+            <div className="glass-card" style={{ padding: 20, width: 380, maxWidth: "calc(100vw - 24px)", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{p.name}</div>
+                  <code style={{ fontSize: 10, color: "#6b7280" }}>{p.code}</code>
+                </div>
+                <DistribBadge type={p.distributionType} />
+                <button onClick={() => setDetailTarget(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af" }}><X size={16} /></button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, paddingTop: 14, borderTop: "1px solid #f3f4f6" }}>
+                <CardFieldP label="Prix">{p.price > 0 ? `${p.price.toLocaleString()} MRU` : "—"}</CardFieldP>
+                <CardFieldP label="Commandes">{p._count.orders}</CardFieldP>
+                <div style={{ gridColumn: "1 / -1" }}><CardFieldP label="Agents assignés">{assignedBadges(p)}</CardFieldP></div>
+                <div style={{ gridColumn: "1 / -1" }}><CardFieldP label="Masqué pour">{hiddenBadges(p)}</CardFieldP></div>
+              </div>
+
+              <button onClick={() => { setDetailTarget(null); setEditTarget(p); }}
+                style={{ marginTop: 18, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: 38, border: "none", background: "#0d3938", color: "white", borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                <Edit2 size={13} /> Modifier
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {showBulkEdit && (
         <BulkEditModal
