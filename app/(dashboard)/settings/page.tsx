@@ -528,7 +528,7 @@ function SystemTab() {
             </p>
           </Card>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8 }}>
+          <div className="kpi-band">
             {([
               { label: "Commandes",  value: stats.orders,   color: "#0d3938" },
               { label: "Employés",   value: stats.users,    color: "#0ea5e9" },

@@ -186,7 +186,7 @@ export default function EmployeesPage() {
       </div>
 
       {/* STATS */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8, marginBottom: 12 }}>
+      <div className="kpi-band" style={{ marginBottom: 12 }}>
         {[
           { label: "Total",     value: total,     icon: <Users        size={13}/>, bg: "#beecdf" },
           { label: "En ligne",  value: online,    icon: <CheckCircle2 size={13}/>, bg: "#dcfce7" },

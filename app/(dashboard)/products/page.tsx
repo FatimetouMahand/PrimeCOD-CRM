@@ -120,7 +120,7 @@ export default function ProductsPage() {
       </div>
 
       {/* QUICK STATS */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8, marginBottom: 12 }}>
+      <div className="kpi-band" style={{ marginBottom: 12 }}>
         {[
           { label: "Total produits",          value: products.length,            icon: <Package      size={13}/>, bg: "#beecdf" },
           { label: "Commandes totales",       value: totalOrders,                icon: <ShoppingCart size={13}/>, bg: "#dcfce7" },

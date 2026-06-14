@@ -594,7 +594,7 @@ export default function OrdersPage() {
           </button>
 
           {/* 4 KPI colorés (Total cliquable, les autres en lecture) */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
+          <div className="kpi-band">
             {[
               { key: "all"  as const, label: "Total commandes",            value: stats.total,                            growth: stats.totalGrowth,            points: false, icon: <ShoppingCart size={15}/>, bg: "#beecdf", fg: "#0d3938", iconBg: "#9fe1cb", clickable: true  },
               { key: null,            label: "Revenu total",               value: `${stats.revenue.toLocaleString()} MRU`, growth: stats.revenueGrowth,          points: false, icon: <DollarSign  size={15}/>,  bg: "#dcfce7", fg: "#14532d", iconBg: "#bbf7d0", clickable: false },

@@ -138,7 +138,7 @@ export default function StatusesPage() {
       </div>
 
       {/* Quick stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8, marginBottom: 14 }}>
+      <div className="kpi-band" style={{ marginBottom: 14 }}>
         {[
           { label: "Total statuts",  value: statuses.length,                                      icon: <ListChecks  size={13}/>, bg: "#beecdf" },
           { label: "Actifs",         value: active.length,                                        icon: <CheckCircle2 size={13}/>, bg: "#dcfce7" },
