@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const [orders, users, products, statuses, dbSizeResult] = await Promise.all([
       prisma.order.count(),
-      prisma.user.count(),
+      prisma.user.count({ where: { role: { not: "ADMIN" } } }), // employés = hors admin
       prisma.product.count(),
       prisma.status.count(),
       prisma.$queryRaw<{ size: string }[]>`

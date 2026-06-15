@@ -5,6 +5,7 @@ import {
   PackagePlus, Trash2, Edit2, Pencil, Search,
   Package, ShoppingCart, Users, Shuffle, X, ChevronDown, ChevronRight,
 } from "lucide-react";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Agent   { id: string; name: string; }
@@ -18,6 +19,7 @@ interface Product {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function ProductsPage() {
+  const currency = useCurrency();
   const [products,   setProducts]   = useState<Product[]>([]);
   const [agents,     setAgents]     = useState<Agent[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -199,7 +201,7 @@ export default function ProductsPage() {
                       <td style={{ ...tdP, fontWeight: 700 }}>{p.name}</td>
 
                       <td style={{ ...tdP, color: "#16a34a", fontWeight: 600 }}>
-                        {p.price > 0 ? `${p.price.toLocaleString()} MRU` : "—"}
+                        {p.price > 0 ? `${p.price.toLocaleString()} ${currency}` : "—"}
                       </td>
 
                       <td style={tdP}><DistribBadge type={p.distributionType} /></td>
@@ -263,7 +265,7 @@ export default function ProductsPage() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, paddingTop: 14, borderTop: "1px solid #f3f4f6" }}>
-                <CardFieldP label="Prix">{p.price > 0 ? `${p.price.toLocaleString()} MRU` : "—"}</CardFieldP>
+                <CardFieldP label="Prix">{p.price > 0 ? `${p.price.toLocaleString()} ${currency}` : "—"}</CardFieldP>
                 <CardFieldP label="Commandes">{p._count.orders}</CardFieldP>
                 <div style={{ gridColumn: "1 / -1" }}><CardFieldP label="Agents assignés">{assignedBadges(p)}</CardFieldP></div>
                 <div style={{ gridColumn: "1 / -1" }}><CardFieldP label="Masqué pour">{hiddenBadges(p)}</CardFieldP></div>
@@ -369,6 +371,7 @@ function AgentMultiSelect({ label, agents, selected, onToggle, placeholder = "Se
 function ProductModal({ product, agents, onClose, onSaved }: {
   product?: Product; agents: Agent[]; onClose: () => void; onSaved: (p: Product) => void;
 }) {
+  const currency = useCurrency();
   const [name,    setName]    = useState(product?.name  ?? "");
   const [price,   setPrice]   = useState(product?.price ?? 0);
   const [distrib, setDistrib] = useState(product?.distributionType ?? "random");
@@ -424,7 +427,7 @@ function ProductModal({ product, agents, onClose, onSaved }: {
           )}
 
           <div>
-            <label style={L}>Prix (MRU)</label>
+            <label style={L}>Prix ({currency})</label>
             <input type="number" min="0" value={price} onChange={e => setPrice(Number(e.target.value))} placeholder="0" style={I} />
           </div>
 
@@ -480,6 +483,7 @@ function ProductModal({ product, agents, onClose, onSaved }: {
 function BulkEditModal({ ids, agents, onClose, onSaved }: {
   ids: string[]; agents: Agent[]; onClose: () => void; onSaved: (products: Product[]) => void;
 }) {
+  const currency = useCurrency();
   const [editPrice,   setEditPrice]   = useState(false);
   const [price,       setPrice]       = useState(0);
   const [editDistrib, setEditDistrib] = useState(false);
@@ -532,7 +536,7 @@ function BulkEditModal({ ids, agents, onClose, onSaved }: {
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: editPrice ? 8 : 0 }}>
               <input type="checkbox" checked={editPrice} onChange={e => setEditPrice(e.target.checked)} />
-              Prix (MRU)
+              Prix ({currency})
             </label>
             {editPrice && (
               <input type="number" min="0" value={price} onChange={e => setPrice(Number(e.target.value))} placeholder="0" style={I} />

@@ -10,6 +10,7 @@ import {
 import { SessionBar } from "./SessionBar";
 import { RebalanceWatcher } from "./RebalanceWatcher";
 import { UserProvider, useUser } from "@/contexts/UserContext";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
 
 // Nav items per role
 const NAV_ADMIN = [
@@ -249,7 +250,9 @@ function Shell({ children }: { children: React.ReactNode }) {
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <UserProvider>
-      <Shell>{children}</Shell>
+      <CurrencyProvider>
+        <Shell>{children}</Shell>
+      </CurrencyProvider>
     </UserProvider>
   );
 }

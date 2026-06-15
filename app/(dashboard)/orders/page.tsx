@@ -8,6 +8,7 @@ import {
   ArrowUp, ArrowDown, Pencil,
 } from "lucide-react";
 import { useUser } from "@/contexts/UserContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Agent   { id: string; name: string; iconColor?: string; }
@@ -144,6 +145,7 @@ export default function OrdersPage() {
 
   const user    = useUser();
   const isAgent = user?.role === "AGENT" || user?.role === "AGENT_TEST";
+  const currency = useCurrency();
 
   // ── Fetch orders ──────────────────────────────────────────────────────
   // `silent` : recharge en arrière-plan sans afficher le "Chargement…"
@@ -410,9 +412,9 @@ export default function OrdersPage() {
       case "phone":    return <span style={{ color: "#6b7280", fontFamily: "monospace" }}>{o.phone}</span>;
       case "city":     return o.city;
       case "product":  return o.product?.name ?? "—";
-      case "price":    return `${o.price.toLocaleString()} MRU`;
+      case "price":    return `${o.price.toLocaleString()} ${currency}`;
       case "qty":      return <span style={{ fontWeight: 600 }}>{o.quantity}</span>;
-      case "revenue":  return <strong style={{ color: "#16a34a" }}>{o.revenue.toLocaleString()} MRU</strong>;
+      case "revenue":  return <strong style={{ color: "#16a34a" }}>{o.revenue.toLocaleString()} {currency}</strong>;
       case "agent":
         if (isAgent) {
           return <span style={{ fontSize: 10, color: "#6b7280" }}>{o.agent?.name ?? "—"}</span>;
@@ -593,7 +595,7 @@ export default function OrdersPage() {
           {([
             { key: "recall" as const, label: "À rappeler",                value: stats.toRecall,                          growth: null as number | null,         points: false, icon: <Bell size={15}/>,        clickable: true,  alert: true  },
             { key: "all"    as const, label: "Total commandes",           value: stats.total,                             growth: stats.totalGrowth,             points: false, icon: <ShoppingCart size={15}/>, clickable: true,  alert: false },
-            { key: null,              label: "Revenu total",              value: `${stats.revenue.toLocaleString()} MRU`, growth: stats.revenueGrowth,           points: false, icon: <DollarSign size={15}/>,  clickable: false, alert: false },
+            { key: null,              label: "Revenu total",              value: `${stats.revenue.toLocaleString()} ${currency}`, growth: stats.revenueGrowth,   points: false, icon: <DollarSign size={15}/>,  clickable: false, alert: false },
             { key: null,              label: "Taux de confirmation",      value: `${stats.confirmationRate}%`,            growth: stats.confirmationRateGrowth,  points: true,  icon: <CheckCircle2 size={15}/>, clickable: false, alert: false },
             { key: null,              label: "Temps moyen de traitement", value: fmtMinutes(stats.avgProcessingTimeMin),  growth: stats.avgProcessingGrowth,     points: false, icon: <Clock3 size={15}/>,      clickable: false, alert: false },
           ]).map((c, idx) => {

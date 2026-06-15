@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@/contexts/UserContext";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 import {
   ShoppingCart,
@@ -161,6 +162,7 @@ function fmtMinutes(min: number | null) {
 export default function DashboardPage() {
   const user = useUser();
   const isAgent = user?.role === "AGENT" || user?.role === "AGENT_TEST";
+  const currency = useCurrency();
 
   const [data, setData] =
     useState<DashboardData | null>(
@@ -526,7 +528,7 @@ export default function DashboardPage() {
             },
             {
               title: "Revenu",
-              value: `${data.revenue.toLocaleString("fr-FR")} MRU`,
+              value: `${data.revenue.toLocaleString("fr-FR")} ${currency}`,
               growth: data.revenueGrowth,
               icon: <DollarSign size={15} />,
               bg: "#dcfce7",
@@ -543,7 +545,7 @@ export default function DashboardPage() {
               title: "Commandes traitées",
               value: data.processedOrders,
               growth: data.processedGrowth,
-              sub: `${data.processedRevenue.toLocaleString("fr-FR")} MRU`,
+              sub: `${data.processedRevenue.toLocaleString("fr-FR")} ${currency}`,
               icon: <CheckCircle2 size={15} />,
               bg: "#dbeafe",
             },
@@ -551,7 +553,7 @@ export default function DashboardPage() {
               title: "En attente",
               value: data.pendingOrders,
               growth: data.pendingGrowth,
-              sub: `${(data.revenue - data.processedRevenue).toLocaleString("fr-FR")} MRU`,
+              sub: `${(data.revenue - data.processedRevenue).toLocaleString("fr-FR")} ${currency}`,
               icon: <Clock3 size={15} />,
               bg: "#ffedd5",
             },
@@ -858,7 +860,7 @@ export default function DashboardPage() {
                             color: "#9ca3af",
                           }}
                         >
-                          {item.revenue.toLocaleString("fr-FR")} MRU
+                          {item.revenue.toLocaleString("fr-FR")} {currency}
                         </div>
                       </div>
                     </div>
@@ -1210,7 +1212,7 @@ export default function DashboardPage() {
                             {order.status}
                           </span>
                         </td>
-                        <td>{order.amount} MRU</td>
+                        <td>{order.amount} {currency}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1226,7 +1228,7 @@ export default function DashboardPage() {
                       <div style={{ fontSize: 10, color: "#9ca3af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{order.product} · {order.city}</div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700 }}>{order.amount} MRU</div>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{order.amount} {currency}</div>
                       <span style={{ fontSize: 9, fontWeight: 700, color: "#6b7280" }}>{order.status}</span>
                     </div>
                   </div>
