@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@/contexts/UserContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useLang } from "@/contexts/LanguageContext";
 
 import {
   ShoppingCart,
@@ -163,6 +164,7 @@ export default function DashboardPage() {
   const user = useUser();
   const isAgent = user?.role === "AGENT" || user?.role === "AGENT_TEST";
   const currency = useCurrency();
+  const { t } = useLang();
 
   const [data, setData] =
     useState<DashboardData | null>(
@@ -240,7 +242,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div style={{ padding: "20px", fontSize: "12px", color: "#9ca3af" }}>
-        Chargement…
+        {t("common.loading")}
       </div>
     );
   }
@@ -248,7 +250,7 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <div style={{ padding: "20px", fontSize: "12px", color: "#9ca3af" }}>
-        Aucune donnée
+        {t("common.noData")}
       </div>
     );
   }
@@ -274,7 +276,7 @@ export default function DashboardPage() {
               marginBottom: "3px",
             }}
           >
-            {isAgent ? "Mon tableau de bord" : "Tableau de bord"}
+            {isAgent ? t("dash.myTitle") : t("dash.title")}
           </h1>
 
           <p
@@ -283,7 +285,7 @@ export default function DashboardPage() {
               fontSize: "11px",
             }}
           >
-            {isAgent ? "Mes performances personnelles" : "Vue d'ensemble des performances"}
+            {isAgent ? t("dash.mySubtitle") : t("dash.subtitle")}
           </p>
         </div>
 
@@ -310,7 +312,7 @@ export default function DashboardPage() {
       cursor: "pointer",
     }}
   >
-    Exporter PDF
+    {t("dash.exportPdf")}
   </button>
 
   <button
@@ -328,7 +330,7 @@ export default function DashboardPage() {
       cursor: "pointer",
     }}
   >
-    Exporter Excel
+    {t("dash.exportExcel")}
   </button>
 </div>
 
@@ -347,11 +349,11 @@ export default function DashboardPage() {
         }}
       >
         {([
-          ["Today", "Aujourd'hui"],
-          ["This Week", "Cette semaine"],
-          ["This Month", "Ce mois"],
-          ["Custom Range", "Personnalisé"],
-        ] as const).map(([value, label]) => (
+          ["Today", "filter.today"],
+          ["This Week", "filter.week"],
+          ["This Month", "filter.month"],
+          ["Custom Range", "filter.custom"],
+        ] as const).map(([value, labelKey]) => (
           <button
             key={value}
             onClick={() => setSelectedFilter(value)}
@@ -366,7 +368,7 @@ export default function DashboardPage() {
               cursor: "pointer",
             }}
           >
-            {label}
+            {t(labelKey)}
           </button>
         ))}
 
@@ -429,10 +431,10 @@ export default function DashboardPage() {
             }}
           >
             {selectedProductIds.length === 0
-              ? "Tous les produits"
+              ? t("dash.allProducts")
               : selectedProductIds.length === 1
-                ? products.find((p) => p.id === selectedProductIds[0])?.name ?? "1 produit"
-                : `${selectedProductIds.length} produits sélectionnés`}
+                ? products.find((p) => p.id === selectedProductIds[0])?.name ?? "1"
+                : `${selectedProductIds.length} ${t("dash.productsSuffix")}`}
             <ChevronDown size={12} />
           </button>
 
@@ -474,7 +476,7 @@ export default function DashboardPage() {
                     checked={selectedProductIds.length === 0}
                     onChange={() => setSelectedProductIds([])}
                   />
-                  Tous les produits
+                  {t("dash.allProducts")}
                 </label>
 
                 <div style={{ borderTop: "1px solid #f3f4f6", margin: "4px 0" }} />
@@ -520,21 +522,21 @@ export default function DashboardPage() {
         {(
           [
             {
-              title: "Total commandes",
+              title: t("kpi.totalOrders"),
               value: data.totalOrders,
               growth: data.ordersGrowth,
               icon: <ShoppingCart size={15} />,
               bg: "#beecdf",
             },
             {
-              title: "Revenu",
+              title: t("kpi.revenue"),
               value: `${data.revenue.toLocaleString("fr-FR")} ${currency}`,
               growth: data.revenueGrowth,
               icon: <DollarSign size={15} />,
               bg: "#dcfce7",
             },
             {
-              title: "Taux de confirmation",
+              title: t("kpi.confirmRate"),
               value: `${data.confirmationRate}%`,
               growth: data.confirmationRateGrowth,
               points: true,
@@ -542,7 +544,7 @@ export default function DashboardPage() {
               bg: "#fef3c7",
             },
             {
-              title: "Commandes traitées",
+              title: t("kpi.processed"),
               value: data.processedOrders,
               growth: data.processedGrowth,
               sub: `${data.processedRevenue.toLocaleString("fr-FR")} ${currency}`,
@@ -550,7 +552,7 @@ export default function DashboardPage() {
               bg: "#dbeafe",
             },
             {
-              title: "En attente",
+              title: t("kpi.pending"),
               value: data.pendingOrders,
               growth: data.pendingGrowth,
               sub: `${(data.revenue - data.processedRevenue).toLocaleString("fr-FR")} ${currency}`,
@@ -558,13 +560,13 @@ export default function DashboardPage() {
               bg: "#ffedd5",
             },
             {
-              title: "À rappeler",
+              title: t("kpi.toRecall"),
               value: data.toRecall,
               icon: <Bell size={15} />,
               bg: "#fee2e2",
             },
             {
-              title: "Temps moyen de traitement",
+              title: t("kpi.avgTime"),
               value: fmtMinutes(data.avgProcessingTimeMin),
               growth: data.avgProcessingGrowth,
               icon: <Timer size={15} />,
@@ -634,7 +636,7 @@ export default function DashboardPage() {
                       "700",
                   }}
                 >
-                  Analyse des revenus
+                  {t("chart.revenue")}
                 </h2>
 
                 <p
@@ -645,7 +647,7 @@ export default function DashboardPage() {
                       "#9ca3af",
                   }}
                 >
-                  Rapport des ventes
+                  {t("chart.salesReport")}
                 </p>
               </div>
 
@@ -671,7 +673,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                Aucune donnée
+                {t("common.noData")}
               </div>
             ) : (
               <div
@@ -725,7 +727,7 @@ export default function DashboardPage() {
                   "14px",
               }}
             >
-              Statut des commandes
+              {t("chart.ordersStatus")}
             </h2>
 
             {data.statusStats
@@ -745,7 +747,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                Aucune donnée
+                {t("common.noData")}
               </div>
             ) : (
               <>
@@ -849,7 +851,7 @@ export default function DashboardPage() {
                       <div style={{ textAlign: "right" }}>
                         <div>
                           <strong>{item.value}</strong>{" "}
-                          commande{item.value > 1 ? "s" : ""}{" "}
+                          {t("unit.orders")}{" "}
                           <span style={{ color: "#9ca3af" }}>
                             ({item.percentage}%)
                           </span>
@@ -913,7 +915,7 @@ export default function DashboardPage() {
                     "700",
                 }}
               >
-                Meilleurs produits
+                {t("chart.topProducts")}
               </h2>
             </div>
 
@@ -927,7 +929,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                Aucun produit
+                {t("common.noProduct")}
               </p>
             ) : (
               <>
@@ -983,7 +985,7 @@ export default function DashboardPage() {
                     >
                       <span>{p.name}</span>
                       <span style={{ color: "#6b7280" }}>
-                        {p.unitsSold} pcs vendues ·{" "}
+                        {p.unitsSold} {t("unit.sold")} ·{" "}
                         <strong
                           style={{
                             color:
@@ -992,7 +994,7 @@ export default function DashboardPage() {
                                 : "#dc2626",
                           }}
                         >
-                          {p.confirmationRate}% conf.
+                          {p.confirmationRate}% {t("unit.conf")}
                         </strong>
                       </span>
                     </div>
@@ -1032,7 +1034,7 @@ export default function DashboardPage() {
                     "700",
                 }}
               >
-                Meilleurs agents
+                {t("chart.topAgents")}
               </h2>
             </div>
 
@@ -1046,7 +1048,7 @@ export default function DashboardPage() {
                     "11px",
                 }}
               >
-                Aucun agent
+                {t("common.noAgent")}
               </p>
             ) : (
               data.topAgents?.map(
@@ -1110,7 +1112,7 @@ export default function DashboardPage() {
 
                     <div style={{ textAlign: "right" }}>
                       <div>
-                        <strong>{agent.total}</strong> leads
+                        <strong>{agent.total}</strong> {t("unit.leads")}
                       </div>
                       <div
                         style={{
@@ -1119,7 +1121,7 @@ export default function DashboardPage() {
                           marginTop: "2px",
                         }}
                       >
-                        {agent.confirmationRate}% conf. ·{" "}
+                        {agent.confirmationRate}% {t("unit.conf")} ·{" "}
                         {fmtMinutes(agent.avgProcessingTimeMin)}
                       </div>
                     </div>
@@ -1138,10 +1140,10 @@ export default function DashboardPage() {
         <div style={{ padding: "14px" }}>
           <div style={{ marginBottom: "14px" }}>
             <h2 style={{ fontSize: "13px", fontWeight: "700" }}>
-              Taux de confirmation selon le temps de traitement
+              {t("chart.confByDelay")}
             </h2>
             <p style={{ fontSize: "10px", color: "#9ca3af" }}>
-              Taux de confirmation des commandes selon le délai écoulé avant le 1er traitement (appel)
+              {t("chart.confByDelaySub")}
             </p>
           </div>
 
@@ -1157,7 +1159,7 @@ export default function DashboardPage() {
                 fontSize: "11px",
               }}
             >
-              No data yet
+              {t("common.noData")}
             </div>
           ) : (
             <div style={{ width: "100%", height: "180px" }}>
@@ -1182,11 +1184,11 @@ export default function DashboardPage() {
       <div className="glass-card">
         <div style={{ padding: "14px" }}>
           <h2 style={{ fontSize: "13px", fontWeight: "700", marginBottom: "12px" }}>
-            Commandes récentes
+            {t("dash.recentOrders")}
           </h2>
 
           {data.recentOrders?.length === 0 ? (
-            <p style={{ fontSize: 11, color: "#9ca3af", padding: "8px 0" }}>Aucune commande</p>
+            <p style={{ fontSize: 11, color: "#9ca3af", padding: "8px 0" }}>{t("common.noOrder")}</p>
           ) : (
             <>
               {/* PC : tableau */}
@@ -1194,11 +1196,11 @@ export default function DashboardPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
                   <thead>
                     <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-                      <th style={{ paddingBottom: "10px" }}>Client</th>
-                      <th style={{ paddingBottom: "10px" }}>Produit</th>
-                      <th style={{ paddingBottom: "10px" }}>Ville</th>
-                      <th style={{ paddingBottom: "10px" }}>Statut</th>
-                      <th style={{ paddingBottom: "10px" }}>Montant</th>
+                      <th style={{ paddingBottom: "10px" }}>{t("col.client")}</th>
+                      <th style={{ paddingBottom: "10px" }}>{t("col.product")}</th>
+                      <th style={{ paddingBottom: "10px" }}>{t("col.city")}</th>
+                      <th style={{ paddingBottom: "10px" }}>{t("col.status")}</th>
+                      <th style={{ paddingBottom: "10px" }}>{t("col.amount")}</th>
                     </tr>
                   </thead>
                   <tbody>
