@@ -11,27 +11,28 @@ import { SessionBar } from "./SessionBar";
 import { RebalanceWatcher } from "./RebalanceWatcher";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { LanguageProvider, useLang } from "@/contexts/LanguageContext";
 
-// Nav items per role
+// Nav items per role (labelKey = clé de traduction)
 const NAV_ADMIN = [
-  { href: "/dashboard",  label: "Dashboard",   Icon: LayoutDashboard },
-  { href: "/orders",     label: "Commandes",   Icon: ShoppingCart },
-  { href: "/employees",  label: "Employés",    Icon: Users },
-  { href: "/products",   label: "Produits",    Icon: Package },
-  { href: "/statuses",   label: "Statuts",     Icon: Tag },
-  { href: "/settings",   label: "Paramètres",  Icon: Settings },
+  { href: "/dashboard",  labelKey: "nav.dashboard",  Icon: LayoutDashboard },
+  { href: "/orders",     labelKey: "nav.orders",     Icon: ShoppingCart },
+  { href: "/employees",  labelKey: "nav.employees",  Icon: Users },
+  { href: "/products",   labelKey: "nav.products",   Icon: Package },
+  { href: "/statuses",   labelKey: "nav.statuses",   Icon: Tag },
+  { href: "/settings",   labelKey: "nav.settings",   Icon: Settings },
 ];
 
 const NAV_SUPERVISOR = [
-  { href: "/dashboard", label: "Dashboard",  Icon: LayoutDashboard },
-  { href: "/orders",    label: "Commandes",  Icon: ShoppingCart },
-  { href: "/products",  label: "Produits",   Icon: Package },
-  { href: "/statuses",  label: "Statuts",    Icon: Tag },
+  { href: "/dashboard", labelKey: "nav.dashboard", Icon: LayoutDashboard },
+  { href: "/orders",    labelKey: "nav.orders",    Icon: ShoppingCart },
+  { href: "/products",  labelKey: "nav.products",  Icon: Package },
+  { href: "/statuses",  labelKey: "nav.statuses",  Icon: Tag },
 ];
 
 const NAV_AGENT = [
-  { href: "/dashboard", label: "Mon Dashboard", Icon: LayoutDashboard },
-  { href: "/orders",    label: "Mes Commandes",  Icon: ShoppingCart },
+  { href: "/dashboard", labelKey: "nav.myDashboard", Icon: LayoutDashboard },
+  { href: "/orders",    labelKey: "nav.myOrders",    Icon: ShoppingCart },
 ];
 
 // Pages allowed per role (new enum names)
@@ -51,6 +52,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
   const user     = useUser();
+  const { t, dir } = useLang();
+  const rtl = dir === "rtl";
 
   // Detect mobile + handle resize
   useEffect(() => {
@@ -106,14 +109,16 @@ function Shell({ children }: { children: React.ReactNode }) {
         minWidth: sidebarWidth,
         overflow: "hidden",
         background: "white",
-        borderRight: open ? "1px solid #e5e7eb" : "none",
         position: "fixed",
-        top: 0, left: 0, bottom: 0,
+        top: 0, bottom: 0,
         transition: "width 0.22s cubic-bezier(.4,0,.2,1), min-width 0.22s",
         zIndex: 100,
         display: "flex",
         flexDirection: "column",
         boxShadow: isMobile && open ? "4px 0 24px rgba(0,0,0,0.08)" : "none",
+        ...(rtl
+          ? { right: 0, borderLeft:  open ? "1px solid #e5e7eb" : "none" }
+          : { left: 0,  borderRight: open ? "1px solid #e5e7eb" : "none" }),
       }}>
         <div style={{ padding: "22px 18px", flex: 1, overflow: "auto" }}>
           {/* Logo + close button on mobile */}
@@ -156,13 +161,13 @@ function Shell({ children }: { children: React.ReactNode }) {
               color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5,
               whiteSpace: "nowrap",
             }}>
-              {user.role === "ADMIN" ? "⚙ Administration" : user.role === "SUPERVISOR" ? "👁 Superviseur" : "📋 Agent"}
+              {user.role === "ADMIN" ? t("role.admin") : user.role === "SUPERVISOR" ? t("role.supervisor") : t("role.agent")}
             </div>
           )}
 
           {/* Nav */}
           <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {navItems.map(({ href, label, Icon }) => {
+            {navItems.map(({ href, labelKey, Icon }) => {
               const active = pathname === href || pathname.startsWith(href + "/");
               return (
                 <Link key={href} href={href} style={{
@@ -179,7 +184,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                   onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                 >
                   <Icon size={15} />
-                  {label}
+                  {t(labelKey)}
                 </Link>
               );
             })}
@@ -190,9 +195,10 @@ function Shell({ children }: { children: React.ReactNode }) {
       {/* ── Main ── */}
       <div style={{
         flex: 1,
-        // On mobile: never push (sidebar is overlay). On desktop: push by sidebar width.
-        marginLeft: isMobile ? 0 : sidebarWidth,
-        transition: "margin-left 0.22s cubic-bezier(.4,0,.2,1)",
+        // On mobile: never push (sidebar is overlay). On desktop: push by sidebar width
+        // (côté gauche en LTR, côté droit en RTL/arabe).
+        ...(isMobile ? {} : (rtl ? { marginRight: sidebarWidth } : { marginLeft: sidebarWidth })),
+        transition: "margin 0.22s cubic-bezier(.4,0,.2,1)",
         minWidth: 0,
         width: "100%",
       }}>
@@ -219,7 +225,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </button>
             <input
               type="text"
-              placeholder="Rechercher…"
+              placeholder={t("common.search")}
               className="search-mobile-compact"
               style={{
                 width: 220, height: 36, border: "1.5px solid #e5e7eb",
@@ -250,9 +256,11 @@ function Shell({ children }: { children: React.ReactNode }) {
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <UserProvider>
-      <CurrencyProvider>
-        <Shell>{children}</Shell>
-      </CurrencyProvider>
+      <LanguageProvider>
+        <CurrencyProvider>
+          <Shell>{children}</Shell>
+        </CurrencyProvider>
+      </LanguageProvider>
     </UserProvider>
   );
 }
