@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { useUser } from "@/contexts/UserContext";
 
 import {
   ShoppingCart,
@@ -158,6 +159,9 @@ function fmtMinutes(min: number | null) {
 }
 
 export default function DashboardPage() {
+  const user = useUser();
+  const isAgent = user?.role === "AGENT" || user?.role === "AGENT_TEST";
+
   const [data, setData] =
     useState<DashboardData | null>(
       null
@@ -268,7 +272,7 @@ export default function DashboardPage() {
               marginBottom: "3px",
             }}
           >
-            Tableau de bord
+            {isAgent ? "Mon tableau de bord" : "Tableau de bord"}
           </h1>
 
           <p
@@ -277,7 +281,7 @@ export default function DashboardPage() {
               fontSize: "11px",
             }}
           >
-            Vue d&apos;ensemble des performances
+            {isAgent ? "Mes performances personnelles" : "Vue d'ensemble des performances"}
           </p>
         </div>
 
@@ -872,8 +876,7 @@ export default function DashboardPage() {
         className="stack-mobile"
         style={{
           display: "grid",
-          gridTemplateColumns:
-            "1fr 1fr",
+          gridTemplateColumns: isAgent ? "1fr" : "1fr 1fr",
           gap: "12px",
           marginBottom: "14px",
         }}
@@ -998,8 +1001,9 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* AGENTS */}
+        {/* AGENTS — masqué pour l'agent (pas de comparaison entre agents) */}
 
+        {!isAgent && (
         <div className="glass-card">
           <div
             style={{
@@ -1123,6 +1127,7 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* CONFIRMATION VS DELAY */}

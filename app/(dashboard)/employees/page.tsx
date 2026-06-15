@@ -339,6 +339,10 @@ export default function EmployeesPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.name || "—"}</div>
                     <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "monospace" }}>{emp.phone}</div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 3, fontSize: 10, fontWeight: 700, color: emp.status === "ONLINE" ? "#16a34a" : "#9ca3af" }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: emp.status === "ONLINE" ? "#22c55e" : "#cbd5e1", display: "inline-block" }} />
+                      {emp.status === "ONLINE" ? "En ligne" : "Hors ligne"}
+                    </span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
                     <RoleBadge role={emp.role} />
@@ -467,12 +471,7 @@ function AddModal({ onClose, onCreated }: { onClose: () => void; onCreated: (e: 
           <Field label="Téléphone (login)" placeholder="+222 XX XX XX XX" value={form.phone} onChange={v => set("phone", v)} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div>
-            <label style={labelStyle}>Rôle</label>
-            <select value={form.role} onChange={e => changeRole(e.target.value)} style={inputStyle}>
-              {CREATABLE_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-            </select>
-          </div>
+          <RoleButtons value={form.role} onChange={changeRole} />
           <Field label="Telegram Chat ID" placeholder="ex: 123456789" value={form.telegramChatId} onChange={v => set("telegramChatId", v)} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -545,12 +544,7 @@ function EditModal({ emp, onClose, onUpdated }: { emp: Employee; onClose: () => 
       <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Field label="Nom complet" value={form.name} onChange={v => set("name", v)} />
-          <div>
-            <label style={labelStyle}>Rôle</label>
-            <select value={form.role} onChange={e => set("role", e.target.value)} style={inputStyle}>
-              {CREATABLE_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-            </select>
-          </div>
+          <RoleButtons value={form.role} onChange={r => set("role", r)} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Field label="Telegram Chat ID" placeholder="ex: 123456789" value={form.telegramChatId} onChange={v => set("telegramChatId", v)} />
@@ -744,6 +738,36 @@ function AccountToggle({ active, onToggle }: { active: boolean; onToggle: () => 
         borderRadius: "50%", background: "white", transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
       }} />
     </button>
+  );
+}
+
+// Sélecteur de rôle en boutons (au lieu d'un menu déroulant natif qui
+// s'affiche en très grand sur téléphone)
+function RoleButtons({ value, onChange }: { value: string; onChange: (r: string) => void }) {
+  return (
+    <div>
+      <label style={labelStyle}>Rôle</label>
+      <div style={{ display: "flex", gap: 6 }}>
+        {CREATABLE_ROLES.map(r => {
+          const active = value === r;
+          return (
+            <button
+              key={r}
+              type="button"
+              onClick={() => onChange(r)}
+              style={{
+                flex: 1, padding: "8px 4px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                border: active ? "2px solid #0d3938" : "1.5px solid #e5e7eb",
+                background: active ? "#beecdf" : "white",
+                color: active ? "#0d3938" : "#374151",
+              }}
+            >
+              {ROLE_LABELS[r]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

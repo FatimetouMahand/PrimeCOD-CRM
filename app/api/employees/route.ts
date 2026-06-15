@@ -32,7 +32,9 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    const ONLINE_MS = 5 * 60 * 1000; // 5 minutes
+    // Fenêtre "en ligne" courte (le client envoie un battement toutes les 60s) :
+    // l'agent passe "hors ligne" ~2 min après avoir fermé l'app → état réel.
+    const ONLINE_MS = 2 * 60 * 1000; // 2 minutes
     const now = new Date();
 
     return NextResponse.json({

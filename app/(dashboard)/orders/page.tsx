@@ -587,63 +587,41 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* ── QUICK STATS (cartes colorées cliquables, comme l'ancien app — nos teintes) ── */}
+      {/* ── QUICK STATS (cartes blanches épurées ; "À rappeler" et "Total" cliquables pour filtrer) ── */}
       {showStats && stats && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-
-          {/* Carte "À rappeler" — pleine largeur, cliquable pour filtrer */}
-          <button
-            onClick={() => setCardFilter(f => f === "recall" ? null : "recall")}
-            style={{
-              textAlign: "left", border: "none", cursor: "pointer", width: "100%",
-              background: "#fee2e2", borderRadius: 14, padding: "10px 14px",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              boxShadow: cardFilter === "recall" ? "0 0 0 2px #ef4444" : "none",
-              transition: "box-shadow .15s",
-            }}
-          >
-            <div>
-              <p style={{ fontSize: 9, fontWeight: 800, color: "#991b1b", textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.85 }}>
-                À rappeler {cardFilter === "recall" && "· filtre actif"}
-              </p>
-              <h2 style={{ fontSize: 21, fontWeight: 800, color: "#7f1d1d", lineHeight: 1.1, marginTop: 2 }}>{stats.toRecall}</h2>
-            </div>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: "#fecaca", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Bell size={16} color="#b91c1c" />
-            </div>
-          </button>
-
-          {/* 4 KPI colorés (Total cliquable, les autres en lecture) */}
-          <div className="kpi-band">
-            {[
-              { key: "all"  as const, label: "Total commandes",            value: stats.total,                            growth: stats.totalGrowth,            points: false, icon: <ShoppingCart size={15}/>, bg: "#beecdf", fg: "#0d3938", iconBg: "#9fe1cb", clickable: true  },
-              { key: null,            label: "Revenu total",               value: `${stats.revenue.toLocaleString()} MRU`, growth: stats.revenueGrowth,          points: false, icon: <DollarSign  size={15}/>,  bg: "#dcfce7", fg: "#14532d", iconBg: "#bbf7d0", clickable: false },
-              { key: null,            label: "Taux de confirmation",       value: `${stats.confirmationRate}%`,           growth: stats.confirmationRateGrowth, points: true,  icon: <CheckCircle2 size={15}/>, bg: "#fef3c7", fg: "#854d0e", iconBg: "#fde68a", clickable: false },
-              { key: null,            label: "Temps moyen de traitement",  value: fmtMinutes(stats.avgProcessingTimeMin), growth: stats.avgProcessingGrowth,    points: false, icon: <Clock3      size={15}/>,  bg: "#dbeafe", fg: "#1e3a8a", iconBg: "#bfdbfe", clickable: false },
-            ].map((c, idx) => (
+        <div className="kpi-band" style={{ marginBottom: 12 }}>
+          {([
+            { key: "recall" as const, label: "À rappeler",                value: stats.toRecall,                          growth: null as number | null,         points: false, icon: <Bell size={15}/>,        clickable: true,  alert: true  },
+            { key: "all"    as const, label: "Total commandes",           value: stats.total,                             growth: stats.totalGrowth,             points: false, icon: <ShoppingCart size={15}/>, clickable: true,  alert: false },
+            { key: null,              label: "Revenu total",              value: `${stats.revenue.toLocaleString()} MRU`, growth: stats.revenueGrowth,           points: false, icon: <DollarSign size={15}/>,  clickable: false, alert: false },
+            { key: null,              label: "Taux de confirmation",      value: `${stats.confirmationRate}%`,            growth: stats.confirmationRateGrowth,  points: true,  icon: <CheckCircle2 size={15}/>, clickable: false, alert: false },
+            { key: null,              label: "Temps moyen de traitement", value: fmtMinutes(stats.avgProcessingTimeMin),  growth: stats.avgProcessingGrowth,     points: false, icon: <Clock3 size={15}/>,      clickable: false, alert: false },
+          ]).map((c, idx) => {
+            const active = c.clickable && cardFilter === c.key;
+            return (
               <button
                 key={idx}
                 onClick={() => c.clickable && setCardFilter(f => f === c.key ? null : c.key)}
                 disabled={!c.clickable}
                 style={{
-                  textAlign: "left", border: "none", cursor: c.clickable ? "pointer" : "default",
-                  background: c.bg, borderRadius: 14, padding: "10px 12px",
-                  display: "flex", flexDirection: "column", gap: 6, minHeight: 70,
-                  boxShadow: c.clickable && cardFilter === c.key ? `0 0 0 2px ${c.fg}` : "none",
-                  transition: "box-shadow .15s",
+                  textAlign: "left", cursor: c.clickable ? "pointer" : "default",
+                  background: "white", borderRadius: 12,
+                  border: active ? "1px solid #0d3938" : "1px solid #edf0f5",
+                  boxShadow: active ? "0 0 0 1px #0d3938" : "none",
+                  padding: "11px 13px",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
-                  <p style={{ fontSize: 9, fontWeight: 800, color: c.fg, textTransform: "uppercase", letterSpacing: "0.03em", opacity: 0.85, lineHeight: 1.3 }}>{c.label}</p>
-                  <div style={{ width: 28, height: 28, borderRadius: 9, background: c.iconBg, color: c.fg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.icon}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+                  <p style={{ fontSize: 9, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>{c.label}</p>
+                  <span style={{ color: c.alert ? "#ef4444" : "#cbd5e1", display: "flex", flexShrink: 0 }}>{c.icon}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                  <h2 style={{ fontSize: 19, fontWeight: 800, color: c.fg, lineHeight: 1 }}>{c.value}</h2>
+                  <h2 style={{ fontSize: 19, fontWeight: 800, color: c.alert ? "#b91c1c" : "#111827", lineHeight: 1 }}>{c.value}</h2>
                   <GrowthBadge value={c.growth} points={c.points} />
                 </div>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
