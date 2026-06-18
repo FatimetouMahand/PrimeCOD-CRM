@@ -320,13 +320,22 @@ export default function ProductsPage() {
 }
 
 // ══ AGENT MULTI-SELECT (réutilisé : agents assignés / agents exclus) ══════════
-function AgentMultiSelect({ label, agents, selected, onToggle, placeholder = "Select agents…", tone = "teal" }: {
+//   - recherche par nom (utile quand il y a beaucoup d'agents)
+//   - `exclude` : agents déjà choisis dans l'AUTRE liste → masqués ici
+//     (un agent assigné ne peut pas être caché, et inversement)
+function AgentMultiSelect({ label, agents, selected, onToggle, placeholder = "Select agents…", tone = "teal", exclude }: {
   label?: string; agents: Agent[]; selected: Set<string>; onToggle: (id: string) => void;
-  placeholder?: string; tone?: "teal" | "red";
+  placeholder?: string; tone?: "teal" | "red"; exclude?: Set<string>;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const badgeBg    = tone === "red" ? "#fee2e2" : "#beecdf";
   const badgeColor = tone === "red" ? "#b91c1c" : "#0d3938";
+
+  const q = query.trim().toLowerCase();
+  const visibleAgents = agents.filter(a =>
+    !(exclude?.has(a.id)) && (q === "" || a.name.toLowerCase().includes(q))
+  );
 
   return (
     <div>
@@ -340,10 +349,20 @@ function AgentMultiSelect({ label, agents, selected, onToggle, placeholder = "Se
           <ChevronDown size={13} />
         </button>
         {open && (
-          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "white", border: "1px solid #e5e7eb", borderRadius: 9, padding: 6, boxShadow: "0 8px 20px rgba(0,0,0,0.08)", maxHeight: 170, overflowY: "auto" }}>
-            {agents.length === 0
-              ? <p style={{ fontSize: 11, color: "#9ca3af", padding: 8 }}>Aucun agent disponible</p>
-              : agents.map(a => (
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "white", border: "1px solid #e5e7eb", borderRadius: 9, padding: 6, boxShadow: "0 8px 20px rgba(0,0,0,0.08)", maxHeight: 210, overflowY: "auto" }}>
+            <div style={{ position: "relative", marginBottom: 6 }}>
+              <Search size={12} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+              <input
+                autoFocus
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Rechercher un agent…"
+                style={{ width: "100%", height: 30, border: "1px solid #e5e7eb", borderRadius: 7, padding: "0 8px 0 26px", fontSize: 11, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            {visibleAgents.length === 0
+              ? <p style={{ fontSize: 11, color: "#9ca3af", padding: 8 }}>{agents.length === 0 ? "Aucun agent disponible" : "Aucun agent trouvé"}</p>
+              : visibleAgents.map(a => (
                 <label key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, cursor: "pointer", background: selected.has(a.id) ? badgeBg : "transparent" }}>
                   <input type="checkbox" checked={selected.has(a.id)} onChange={() => onToggle(a.id)} style={{ cursor: "pointer" }} />
                   <span style={{ fontSize: 11, fontWeight: selected.has(a.id) ? 700 : 400 }}>{a.name}</span>
@@ -459,6 +478,7 @@ function ProductModal({ product, agents, onClose, onSaved }: {
               selected={selAgents}
               onToggle={toggleAgent}
               placeholder="Sélectionner des agents…"
+              exclude={selHidden}
             />
           )}
 
@@ -469,6 +489,7 @@ function ProductModal({ product, agents, onClose, onSaved }: {
             onToggle={toggleHidden}
             placeholder="Aucun agent exclu"
             tone="red"
+            exclude={selAgents}
           />
 
           {error && <p style={{ fontSize: 11, color: "#ef4444" }}>{error}</p>}
@@ -575,7 +596,7 @@ function BulkEditModal({ ids, agents, onClose, onSaved }: {
               Agents assignés
             </label>
             {editAgents && (
-              <AgentMultiSelect agents={agents} selected={selAgents} onToggle={toggleAgent} placeholder="Sélectionner des agents…" />
+              <AgentMultiSelect agents={agents} selected={selAgents} onToggle={toggleAgent} placeholder="Sélectionner des agents…" exclude={selHidden} />
             )}
           </div>
 
@@ -585,7 +606,7 @@ function BulkEditModal({ ids, agents, onClose, onSaved }: {
               Masqué pour (agents exclus)
             </label>
             {editHidden && (
-              <AgentMultiSelect agents={agents} selected={selHidden} onToggle={toggleHidden} placeholder="Aucun agent exclu" tone="red" />
+              <AgentMultiSelect agents={agents} selected={selHidden} onToggle={toggleHidden} placeholder="Aucun agent exclu" tone="red" exclude={selAgents} />
             )}
           </div>
 

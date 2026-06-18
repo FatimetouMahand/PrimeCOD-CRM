@@ -22,6 +22,18 @@ export async function GET(request: Request) {
   const filter = searchParams.get("filter") || "all"; // all | active | suspended
 
   try {
+    // Self-heal : renommer les anciens agents de test vers de vrais prénoms.
+    // Idempotent (ne fait rien si plus aucun « Agent »/« Agent Test » n'existe).
+    // « Agent Test » d'abord (plus spécifique), puis « Agent ».
+    await prisma.user.updateMany({
+      where: { name: { equals: "Agent Test", mode: "insensitive" } },
+      data:  { name: "Sidi" },
+    });
+    await prisma.user.updateMany({
+      where: { name: { equals: "Agent", mode: "insensitive" } },
+      data:  { name: "Ahmed" },
+    });
+
     const employees = await prisma.user.findMany({
       where: {
         role:   { not: "ADMIN" }, // Admin principal never shown

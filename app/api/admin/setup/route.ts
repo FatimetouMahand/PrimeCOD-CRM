@@ -335,7 +335,7 @@ export async function GET(request: Request) {
       const encrypted = encrypt("agent123");
       await prisma.user.create({
         data: {
-          name:              "Agent Test",
+          name:              "Sidi",
           phone:             "22222222",
           password:          hashed,
           encryptedPassword: encrypted,
@@ -356,7 +356,7 @@ export async function GET(request: Request) {
 
     // ── STEP 12: Fix User.name if it's NOT NULL but some rows are empty ──────
     await prisma.$executeRawUnsafe(`
-      UPDATE "User" SET "name" = 'Agent' WHERE "name" IS NULL OR "name" = '';
+      UPDATE "User" SET "name" = 'Sans nom' WHERE "name" IS NULL OR "name" = '';
     `);
     log.push("✅ Noms manquants corrigés");
 
