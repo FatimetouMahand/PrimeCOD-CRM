@@ -1,64 +1,60 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
-const ONLINE_MS = 2 * 60 * 1000;
-
 type ProductConstraint = { assignedAgentIds: string[]; hiddenForAgentIds: string[] };
 
+// Rééquilibrage périodique (toutes les 5 min). Même règle que l'attribution
+// initiale (webhook selectAgent) : on considère TOUS les agents ACTIFS
+// (compte non suspendu) autorisés à voir les commandes — pas seulement ceux
+// connectés, et on les compare TOUS. « Agent le plus libre » = celui qui a le
+// moins de commandes NON TRAITÉES (statusId null). On ne déplace jamais une
+// commande déjà traitée. Quand un agent A se libère après 5 min, les commandes
+// en trop passent de l'agent surchargé vers lui.
 export async function POST() {
   try {
-    const threshold = new Date(Date.now() - ONLINE_MS);
-
-    // Step 1 — expirer les sessions fantômes (pas de battement depuis 2 min)
-    await prisma.user.updateMany({
-      where: { isOnline: true, lastSeenAt: { lt: threshold } },
-      data:  { isOnline: false },
-    });
-
-    // Step 2 — agents EN LIGNE (actifs + connectés récemment)
-    const onlineAgents = await prisma.user.findMany({
+    // Tous les agents ACTIFS autorisés à voir les commandes (pas seulement en ligne).
+    const activeAgents = await prisma.user.findMany({
       where: {
-        role:       { in: ["AGENT", "AGENT_TEST"] },
-        status:     "ACTIVE",
-        isOnline:   true,
-        lastSeenAt: { gte: threshold },
+        role:          { in: ["AGENT", "AGENT_TEST"] },
+        status:        "ACTIVE",
+        canViewOrders: true,
       },
       select: { id: true },
     });
 
-    if (onlineAgents.length === 0) {
-      return NextResponse.json({ message: "No online agents", reassigned: 0 });
+    if (activeAgents.length === 0) {
+      return NextResponse.json({ message: "Aucun agent actif", reassigned: 0 });
     }
 
-    const onlineIds = new Set(onlineAgents.map(a => a.id));
+    const activeIds = new Set(activeAgents.map(a => a.id));
 
-    // Charge courante = commandes NON TRAITÉES (statusId null) par agent en ligne.
-    // Même définition que le webhook (« agent le plus libre = le moins de
-    // commandes pas traitées ») → pas de va-et-vient entre attribution et rééquilibrage.
+    // Charge courante = commandes NON TRAITÉES (statusId null) par agent actif.
+    // Même définition que le webhook → pas de va-et-vient avec l'attribution.
     const load = new Map<string, number>();
-    for (const a of onlineAgents) {
+    for (const a of activeAgents) {
       load.set(a.id, await prisma.order.count({ where: { agentId: a.id, statusId: null } }));
     }
 
-    // Agents éligibles pour un produit (parmi les agents en ligne) :
-    //  - produit spécifique → uniquement ses agents (en ligne, non cachés)
-    //  - sinon → tous les agents en ligne, sauf ceux cachés pour ce produit
+    // Agents éligibles pour un produit (parmi les agents actifs) :
+    //  - produit spécifique → uniquement ses agents (actifs, non cachés)
+    //  - sinon → tous les agents actifs, sauf ceux cachés pour ce produit
     const eligibleFor = (p: ProductConstraint): string[] => {
       const hidden = new Set(p.hiddenForAgentIds ?? []);
-      const specific = (p.assignedAgentIds ?? []).filter(id => onlineIds.has(id) && !hidden.has(id));
+      const specific = (p.assignedAgentIds ?? []).filter(id => activeIds.has(id) && !hidden.has(id));
       if (specific.length > 0) return specific;
-      return [...onlineIds].filter(id => !hidden.has(id));
+      return [...activeIds].filter(id => !hidden.has(id));
     };
 
     let reassigned = 0;
 
-    // Step 3 — Orphelins : commandes NON TRAITÉES dont l'agent est hors-ligne
-    //          ou non assignées → (ré)attribuer au plus libre AGENT ÉLIGIBLE.
-    //          (on ne touche jamais une commande déjà traitée : statusId non nul)
+    // Step 1 — Orphelins : commandes NON TRAITÉES sans agent ou dont l'agent
+    //          n'est plus actif (suspendu/supprimé) → (ré)attribuer au plus
+    //          libre AGENT ÉLIGIBLE. On ne touche jamais aux commandes déjà
+    //          traitées (statusId non nul).
     const orphans = await prisma.order.findMany({
       where: {
         statusId: null,
-        OR: [{ agentId: null }, { agentId: { notIn: [...onlineIds] } }],
+        OR: [{ agentId: null }, { agentId: { notIn: [...activeIds] } }],
       },
       select: { id: true, product: { select: { assignedAgentIds: true, hiddenForAgentIds: true } } },
       orderBy: { createdAt: "asc" },
@@ -66,7 +62,7 @@ export async function POST() {
 
     for (const o of orphans) {
       const elig = eligibleFor(o.product);
-      if (elig.length === 0) continue; // aucun agent en ligne éligible → on laisse
+      if (elig.length === 0) continue; // aucun agent éligible → on laisse
       elig.sort((a, b) => (load.get(a) ?? 0) - (load.get(b) ?? 0));
       const target = elig[0];
       await prisma.order.update({ where: { id: o.id }, data: { agentId: target } });
@@ -74,11 +70,11 @@ export async function POST() {
       reassigned++;
     }
 
-    // Step 4 — Rééquilibrage : décharger les agents surchargés vers les plus
+    // Step 2 — Rééquilibrage : décharger les agents surchargés vers les plus
     //          libres, en respectant les contraintes du produit. C'est ce qui
     //          fait « passer » une commande de A à B quand B devient plus libre.
     const total  = [...load.values()].reduce((s, n) => s + n, 0);
-    const target = Math.ceil(total / onlineAgents.length);
+    const target = Math.ceil(total / activeAgents.length);
 
     for (const [agentId, count] of [...load.entries()]) {
       if (count <= target) continue;
