@@ -18,6 +18,12 @@ async function getCaller() {
 // ─── GET /api/employees ───────────────────────────────────────────────────────
 // Returns all users EXCEPT the main ADMIN (never shown in the list).
 export async function GET(request: Request) {
+  // La liste du personnel (noms, téléphones, permissions) est réservée à l'admin.
+  const caller = await getCaller();
+  if (caller?.role !== "ADMIN") {
+    return NextResponse.json({ error: "Admin uniquement" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get("filter") || "all"; // all | active | suspended
 

@@ -56,6 +56,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const role = await getCallerRole();
+  if (role !== "ADMIN" && role !== "SUPERVISOR") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     const { name, price, distributionType, agentIds, hiddenAgentIds } = await request.json();
     if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -92,6 +96,10 @@ export async function POST(request: Request) {
 // Modification groupée (Actions groupées) — applique des changements à
 // plusieurs produits sélectionnés en une seule requête.
 export async function PATCH(request: Request) {
+  const role = await getCallerRole();
+  if (role !== "ADMIN" && role !== "SUPERVISOR") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     const { ids, price, distributionType, agentIds, hiddenAgentIds } = await request.json();
     if (!Array.isArray(ids) || ids.length === 0) {

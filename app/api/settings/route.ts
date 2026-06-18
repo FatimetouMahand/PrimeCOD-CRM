@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { verifyToken } from "@/lib/auth/jwt";
+import { cookies } from "next/headers";
+
+async function getCallerRole(): Promise<string | null> {
+  try {
+    const token = (await cookies()).get("crm_token")?.value;
+    if (!token) return null;
+    return (verifyToken(token) as { role: string }).role;
+  } catch { return null; }
+}
 
 export async function GET() {
   try {
@@ -19,6 +29,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Les réglages système (seuil de distribution, etc.) sont réservés à l'admin.
+  const role = await getCallerRole();
+  if (role !== "ADMIN") {
+    return NextResponse.json({ error: "Admin uniquement" }, { status: 403 });
+  }
   try {
     const body = await request.json() as Record<string, string>;
     const { distributionThreshold, ...rest } = body;

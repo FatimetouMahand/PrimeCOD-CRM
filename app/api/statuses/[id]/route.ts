@@ -1,10 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { verifyToken } from "@/lib/auth/jwt";
+import { cookies } from "next/headers";
+
+async function getCallerRole(): Promise<string | null> {
+  try {
+    const token = (await cookies()).get("crm_token")?.value;
+    if (!token) return null;
+    return (verifyToken(token) as { role: string }).role;
+  } catch { return null; }
+}
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const role = await getCallerRole();
+  if (role !== "ADMIN" && role !== "SUPERVISOR") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     const { id } = await params;
     const body = await request.json();
@@ -34,6 +48,11 @@ export async function DELETE(
   _: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // La suppression est réservée à l'admin (CLAUDE.md : exclusivité du propriétaire).
+  const role = await getCallerRole();
+  if (role !== "ADMIN") {
+    return NextResponse.json({ error: "Admin uniquement" }, { status: 403 });
+  }
   try {
     const { id } = await params;
     // Suppression logique (isArchived) : le statut disparaît des choix futurs

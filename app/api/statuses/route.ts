@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { verifyToken } from "@/lib/auth/jwt";
+import { cookies } from "next/headers";
+
+async function getCallerRole(): Promise<string | null> {
+  try {
+    const token = (await cookies()).get("crm_token")?.value;
+    if (!token) return null;
+    return (verifyToken(token) as { role: string }).role;
+  } catch { return null; }
+}
 
 // Auto-migration : ajoute la colonne repeatCount si elle n'existe pas encore
 // (le build de prod ne lance pas `prisma migrate`). Idempotent, sans risque.
@@ -30,6 +40,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const role = await getCallerRole();
+  if (role !== "ADMIN" && role !== "SUPERVISOR") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     await ensureRepeatCountColumn();
     const { name, color, alertAfterHours, isFinal, repeatCount } = await request.json();
