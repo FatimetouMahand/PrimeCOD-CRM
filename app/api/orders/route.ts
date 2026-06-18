@@ -24,6 +24,7 @@ export async function GET(request: Request) {
   const search    = searchParams.get("search")    || "";
   const statusId  = searchParams.get("statusId")  || "";
   const productId = searchParams.get("productId") || "";
+  const agentId   = searchParams.get("agentId")   || ""; // "" = tous · "none" = sans agent · id = agent précis
   const dateFrom  = searchParams.get("dateFrom")  || ""; // YYYY-MM-DD
   const dateTo    = searchParams.get("dateTo")    || ""; // YYYY-MM-DD
 
@@ -45,6 +46,11 @@ export async function GET(request: Request) {
     }
   }
 
+  // statusId : "none" → commandes sans statut (non traitées)
+  const statusFilter = statusId === "none" ? { statusId: null } : statusId ? { statusId } : {};
+  // agentId : "none" → commandes sans agent (visibles seulement par l'admin)
+  const agentFilter  = agentId === "none" ? { agentId: null } : agentId ? { agentId } : {};
+
   const where: Record<string, unknown> = {
     ...(search ? {
       OR: [
@@ -52,7 +58,8 @@ export async function GET(request: Request) {
         { phone:    { contains: search } },
       ],
     } : {}),
-    ...(statusId         ? { statusId }                        : {}),
+    ...statusFilter,
+    ...agentFilter,
     ...(productId        ? { productId }                       : {}),
     ...(createdAtFilter  ? { createdAt: createdAtFilter }      : {}),
   };
@@ -88,18 +95,30 @@ export async function GET(request: Request) {
       const whereNoDate: Record<string, unknown> = { ...where };
       delete whereNoDate.createdAt;
 
-      // Confirmed = statuts marqués comme finaux (Confirmée, Confirmed…)
-      // Pending = statuts non-finaux (En attente, Pending, Ne répond pas…)
-      const [confirmed, pending, rev, procAgg, toRecall] = await Promise.all([
-        prisma.order.count({ where: { ...where, status: { isFinal: true } } }),
-        prisma.order.count({ where: { ...where, status: { isFinal: false } } }),
-        prisma.order.aggregate({ where, _sum: { revenue: true } }),
+      // Identifier les statuts « Confirmée » (par le nom, insensible à la casse).
+      const confirmedStatuses = await prisma.status.findMany({
+        where: { name: { contains: "confirm", mode: "insensitive" } },
+        select: { id: true },
+      });
+      const confirmedIds = confirmedStatuses.map(s => s.id);
+      const confirmedWhere = { ...where, statusId: { in: confirmedIds.length ? confirmedIds : ["__none__"] } };
+
+      // confirmed  = commandes au statut « Confirmée »
+      // processed  = commandes TRAITÉES (un statut posé) → base du taux de confirmation
+      // pending    = commandes non traitées (aucun statut)
+      // revenue    = total des commandes CONFIRMÉES uniquement
+      const [confirmed, processed, pending, rev, procAgg, toRecall] = await Promise.all([
+        prisma.order.count({ where: confirmedWhere }),
+        prisma.order.count({ where: { ...where, NOT: [{ statusId: null }] } }),
+        prisma.order.count({ where: { ...where, statusId: null } }),
+        prisma.order.aggregate({ where: confirmedWhere, _sum: { revenue: true } }),
         prisma.order.aggregate({ where: { ...where, processingTimeMin: { not: null } }, _avg: { processingTimeMin: true } }),
         prisma.order.count({ where: { ...whereNoDate, recallAt: { lt: new Date() } } }),
       ]);
 
       const revenue = rev._sum.revenue ?? 0;
-      const confirmationRate = total > 0 ? Number(((confirmed / total) * 100).toFixed(1)) : 0;
+      // Taux de confirmation = confirmées / traitées (ex. 5 confirmées sur 50 traitées = 10%)
+      const confirmationRate = processed > 0 ? Number(((confirmed / processed) * 100).toFixed(1)) : 0;
       const avgProcessingTimeMin = procAgg._avg.processingTimeMin != null
         ? Math.round(procAgg._avg.processingTimeMin)
         : null;
@@ -127,16 +146,18 @@ export async function GET(request: Request) {
           },
         };
 
-        const [prevTotal, prevConfirmed, prevPending, prevRev, prevProcAgg] = await Promise.all([
+        const prevConfirmedWhere = { ...prevWhere, statusId: { in: confirmedIds.length ? confirmedIds : ["__none__"] } };
+        const [prevTotal, prevConfirmed, prevProcessed, prevPending, prevRev, prevProcAgg] = await Promise.all([
           prisma.order.count({ where: prevWhere }),
-          prisma.order.count({ where: { ...prevWhere, status: { isFinal: true } } }),
-          prisma.order.count({ where: { ...prevWhere, status: { isFinal: false } } }),
-          prisma.order.aggregate({ where: prevWhere, _sum: { revenue: true } }),
+          prisma.order.count({ where: prevConfirmedWhere }),
+          prisma.order.count({ where: { ...prevWhere, NOT: [{ statusId: null }] } }),
+          prisma.order.count({ where: { ...prevWhere, statusId: null } }),
+          prisma.order.aggregate({ where: prevConfirmedWhere, _sum: { revenue: true } }),
           prisma.order.aggregate({ where: { ...prevWhere, processingTimeMin: { not: null } }, _avg: { processingTimeMin: true } }),
         ]);
 
         const prevRevenue = prevRev._sum.revenue ?? 0;
-        const prevConfirmationRate = prevTotal > 0 ? (prevConfirmed / prevTotal) * 100 : 0;
+        const prevConfirmationRate = prevProcessed > 0 ? (prevConfirmed / prevProcessed) * 100 : 0;
         const prevAvgProcessing = prevProcAgg._avg.processingTimeMin ?? null;
 
         const growth = (curr: number, prev: number) =>

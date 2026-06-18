@@ -29,23 +29,23 @@ interface Stats {
   confirmationRateGrowth: number | null; avgProcessingGrowth: number | null;
 }
 
-// ── Column definitions ─────────────────────────────────────────────────────
+// ── Définition des colonnes (ordre & libellés comme l'ancienne app) ──────────
 const COLS = [
-  { key: "num",        label: "#",            hideable: false },
-  { key: "date",       label: "Date",         hideable: true  },
-  { key: "customer",   label: "Customer",     hideable: false },
-  { key: "phone",      label: "Phone",        hideable: true  },
-  { key: "city",       label: "City",         hideable: true  },
-  { key: "product",    label: "Product",      hideable: true  },
-  { key: "price",      label: "Price",        hideable: true  },
-  { key: "qty",        label: "Qty",          hideable: true  },
-  { key: "revenue",    label: "Revenue",      hideable: true  },
-  { key: "agent",      label: "Agent",        hideable: true  },
-  { key: "attempts",   label: "Tentatives",   hideable: true  },
-  { key: "processing", label: "Traitement",   hideable: true  },
-  { key: "recall",     label: "Rappel",       hideable: true  },
-  { key: "notes",      label: "Notes",        hideable: true  },
-  { key: "status",     label: "Status",       hideable: false },
+  { key: "num",        label: "N°",          hideable: false },
+  { key: "date",       label: "Date",        hideable: true  },
+  { key: "product",    label: "Produit",     hideable: true  },
+  { key: "price",      label: "Prix",        hideable: true  },
+  { key: "customer",   label: "Client",      hideable: false },
+  { key: "phone",      label: "Téléphone",   hideable: true  },
+  { key: "city",       label: "Ville",       hideable: true  },
+  { key: "qty",        label: "Qté",         hideable: true  },
+  { key: "revenue",    label: "Revenu",      hideable: true  },
+  { key: "agent",      label: "Agent",       hideable: true  },
+  { key: "status",     label: "Statut",      hideable: false },
+  { key: "recall",     label: "Rappel",      hideable: true  },
+  { key: "processing", label: "Traitement",  hideable: true  },
+  { key: "attempts",   label: "Tentatives",  hideable: true  },
+  { key: "notes",      label: "Notes",       hideable: true  },
 ];
 
 function fmtDate(iso: string) {
@@ -106,6 +106,69 @@ function GrowthBadge({ value, points = false }: { value?: number | null; points?
   );
 }
 
+// ── Cellule de rappel éditable EN LIGNE (clic → calendrier date+heure) ───────
+// Reproduit le comportement de l'ancienne app : un clic ouvre un sélecteur
+// date+heure complet ; la valeur passée devient rouge quand elle est dépassée ;
+// vide = « Planifier » (rappel reporté / non spécifié).
+function RecallCellInline({ order, readOnly, onChange }: {
+  order: Order; readOnly: boolean; onChange: (id: string, value: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [temp, setTemp] = useState("");
+
+  const start = () => {
+    if (readOnly) return;
+    setTemp(order.recallAt ? toLocalInput(order.recallAt) : "");
+    setOpen(true);
+  };
+  const commit = () => {
+    const cur = order.recallAt ? toLocalInput(order.recallAt) : "";
+    if (temp !== cur) onChange(order.id, temp ? new Date(temp).toISOString() : null);
+    setOpen(false);
+  };
+
+  if (open) {
+    return (
+      <input
+        type="datetime-local"
+        value={temp}
+        autoFocus
+        onChange={e => setTemp(e.target.value)}
+        onBlur={commit}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => { if (e.key === "Enter") commit(); else if (e.key === "Escape") setOpen(false); }}
+        style={{ height: 30, border: "1px solid #0d3938", borderRadius: 8, padding: "0 6px", fontSize: 11, outline: "none" }}
+      />
+    );
+  }
+
+  const r = fmtRecall(order.recallAt);
+  return (
+    <div
+      onClick={e => { e.stopPropagation(); start(); }}
+      title={readOnly ? undefined : "Cliquer pour planifier / reporter le rappel"}
+      style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start", cursor: readOnly ? "default" : "pointer" }}
+    >
+      {order.recallAt ? (
+        <>
+          {r.overdue && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "#fee2e2", color: "#dc2626", padding: "1px 6px", borderRadius: 999, fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+              <Bell size={9} /> À rappeler
+            </span>
+          )}
+          <span style={{ color: r.overdue ? "#dc2626" : "#374151", fontSize: 11, fontWeight: r.overdue ? 700 : 500 }}>
+            {r.text}
+          </span>
+        </>
+      ) : (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#9ca3af", fontSize: 11, fontStyle: "italic" }}>
+          <Calendar size={11} /> Planifier
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function OrdersPage() {
   const [orders,      setOrders]      = useState<Order[]>([]);
@@ -120,8 +183,9 @@ export default function OrdersPage() {
   const [agents,    setAgents]    = useState<Agent[]>([]);
 
   const [search,        setSearch]        = useState("");
-  const [filterStatus,  setFilterStatus]  = useState("");
+  const [filterStatus,  setFilterStatus]  = useState(""); // "" tous · "none" sans statut · id
   const [filterProduct, setFilterProduct] = useState("");
+  const [filterAgent,   setFilterAgent]   = useState(""); // "" tous · "none" sans agent · id
   const [filterDate,    setFilterDate]    = useState(() => {
     // Default: today
     return new Date().toISOString().slice(0, 10);
@@ -151,14 +215,15 @@ export default function OrdersPage() {
   // `silent` : recharge en arrière-plan sans afficher le "Chargement…"
   // (utilisé par l'auto-actualisation non intrusive).
   const load = useCallback(async (opts: {
-    cursor?: string; search?: string; statusId?: string; productId?: string; date?: string; dateTo?: string; append?: boolean; silent?: boolean;
+    cursor?: string; search?: string; statusId?: string; productId?: string; agentId?: string; date?: string; dateTo?: string; append?: boolean; silent?: boolean;
   } = {}) => {
-    const { cursor, search: q = "", statusId = "", productId = "", date = "", dateTo = "", append = false, silent = false } = opts;
+    const { cursor, search: q = "", statusId = "", productId = "", agentId = "", date = "", dateTo = "", append = false, silent = false } = opts;
     const p = new URLSearchParams();
     if (cursor)    p.set("cursor",    cursor);
     if (q)         p.set("search",    q);
     if (statusId)  p.set("statusId",  statusId);
     if (productId) p.set("productId", productId);
+    if (agentId)   p.set("agentId",   agentId);
     if (date)      { p.set("dateFrom", date); p.set("dateTo", dateTo || date); }
 
     if (!silent) { append ? setLoadingMore(true) : setLoading(true); }
@@ -193,12 +258,12 @@ export default function OrdersPage() {
     if (!sentinel.current) return;
     const obs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && hasMore && !loadingMore) {
-        load({ cursor: nextCursor ?? undefined, search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo, append: true });
+        load({ cursor: nextCursor ?? undefined, search, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: filterDate, dateTo: filterDateTo, append: true });
       }
     }, { threshold: 0.1 });
     obs.observe(sentinel.current);
     return () => obs.disconnect();
-  }, [hasMore, loadingMore, nextCursor, search, filterStatus, filterProduct, filterDate, filterDateTo, load]);
+  }, [hasMore, loadingMore, nextCursor, search, filterStatus, filterProduct, filterAgent, filterDate, filterDateTo, load]);
 
   // ── Auto-actualisation NON intrusive (récupère les nouvelles commandes
   //    Shopify toutes les 60s) ───────────────────────────────────────────
@@ -209,61 +274,64 @@ export default function OrdersPage() {
   useEffect(() => {
     const id = setInterval(() => {
       const atTop    = typeof window !== "undefined" && window.scrollY < 150;
-      const browsing = !!search || !!filterStatus || !!filterProduct;
+      const browsing = !!search || !!filterStatus || !!filterProduct || !!filterAgent;
       const loadingNow = loading || loadingMore;
       if (atTop && !browsing && !loadingNow) {
-        load({ statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo, silent: true });
+        load({ statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: filterDate, dateTo: filterDateTo, silent: true });
       }
     }, 60000);
     return () => clearInterval(id);
-  }, [load, search, filterStatus, filterProduct, filterDate, filterDateTo, loading, loadingMore]);
+  }, [load, search, filterStatus, filterProduct, filterAgent, filterDate, filterDateTo, loading, loadingMore]);
 
   // ── Search (debounced 400ms) ──────────────────────────────────────────
   const handleSearch = (val: string) => {
     setSearch(val);
     if (searchTmr.current) clearTimeout(searchTmr.current);
     searchTmr.current = setTimeout(() => {
-      load({ search: val, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo });
+      load({ search: val, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: filterDate, dateTo: filterDateTo });
     }, 400);
   };
 
-  // ── Filter change ─────────────────────────────────────────────────────
-  const handleFilter = (key: "status" | "product", val: string) => {
+  // ── Filter change (statut / produit / agent) ──────────────────────────
+  const handleFilter = (key: "status" | "product" | "agent", val: string) => {
     const s = key === "status"  ? val : filterStatus;
     const p = key === "product" ? val : filterProduct;
-    key === "status" ? setFilterStatus(val) : setFilterProduct(val);
-    load({ search, statusId: s, productId: p, date: filterDate, dateTo: filterDateTo });
+    const a = key === "agent"   ? val : filterAgent;
+    if (key === "status")  setFilterStatus(val);
+    if (key === "product") setFilterProduct(val);
+    if (key === "agent")   setFilterAgent(val);
+    load({ search, statusId: s, productId: p, agentId: a, date: filterDate, dateTo: filterDateTo });
   };
 
   // ── Date filter (jour unique — réinitialise la plage) ─────────────────
   const handleDate = (val: string) => {
     setFilterDate(val);
     setFilterDateTo("");
-    load({ search, statusId: filterStatus, productId: filterProduct, date: val, dateTo: "" });
+    load({ search, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: val, dateTo: "" });
   };
 
   // ── Plage de dates (période) ───────────────────────────────────────────
   const handleDateRange = (from: string, to: string) => {
     setFilterDate(from);
     setFilterDateTo(to);
-    load({ search, statusId: filterStatus, productId: filterProduct, date: from, dateTo: to });
+    load({ search, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: from, dateTo: to });
   };
 
   const handleDateTo = (val: string) => {
     setFilterDateTo(val);
-    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: val });
+    load({ search, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: filterDate, dateTo: val });
   };
 
   const clearDate = () => {
     setFilterDate("");
     setFilterDateTo("");
-    load({ search, statusId: filterStatus, productId: filterProduct, date: "", dateTo: "" });
+    load({ search, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: "", dateTo: "" });
   };
 
   // ── Refresh ───────────────────────────────────────────────────────────
   const refresh = () => {
     setSelected(new Set());
-    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo });
+    load({ search, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: filterDate, dateTo: filterDateTo });
   };
 
   // ── Selection ─────────────────────────────────────────────────────────
@@ -321,6 +389,20 @@ export default function OrdersPage() {
     if (res.ok) {
       const updated = await res.json();
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, agent: updated.agent } : o));
+    }
+  };
+
+  // ── Rappel éditable en ligne (clic sur la cellule Rappel) ──────────────
+  const handleRecallInline = async (orderId: string, value: string | null) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, recallAt: value } : o)); // optimiste
+    const res = await fetch(`/api/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recallAt: value }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, recallAt: updated.recallAt } : o));
     }
   };
 
@@ -397,7 +479,7 @@ export default function OrdersPage() {
     // Recharge la liste pour refléter les changements
     setSelected(new Set());
     setBulkEdit(false);
-    load({ search, statusId: filterStatus, productId: filterProduct, date: filterDate, dateTo: filterDateTo });
+    load({ search, statusId: filterStatus, productId: filterProduct, agentId: filterAgent, date: filterDate, dateTo: filterDateTo });
   };
 
   // ── Visible columns ───────────────────────────────────────────────────
@@ -469,26 +551,8 @@ export default function OrdersPage() {
           </div>
         );
       }
-      case "recall": {
-        const r = fmtRecall(o.recallAt);
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
-            {r.overdue && (
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 3,
-                background: "#fee2e2", color: "#dc2626",
-                padding: "1px 6px", borderRadius: "999px",
-                fontSize: "9px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.02em",
-              }}>
-                <Bell size={9} /> À rappeler
-              </span>
-            )}
-            <span style={{ color: r.overdue ? "#dc2626" : "#6b7280", fontSize: "11px", fontWeight: r.overdue ? 700 : 400 }}>
-              {r.text}
-            </span>
-          </div>
-        );
-      }
+      case "recall":
+        return <RecallCellInline order={o} readOnly={false} onChange={handleRecallInline} />;
       case "notes":
         return (
           <button
@@ -543,7 +607,7 @@ export default function OrdersPage() {
       {/* ── HEADER ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
         <div>
-          <h1 style={{ fontSize: "22px", fontWeight: 800, marginBottom: "3px" }}>Orders</h1>
+          <h1 style={{ fontSize: "22px", fontWeight: 800, marginBottom: "3px" }}>Commandes</h1>
           <p style={{ color: "#6b7280", fontSize: "11px" }}>
             {stats ? `${stats.total.toLocaleString()} commandes` : "Toutes les commandes"}
             {filterDate && (
@@ -595,7 +659,7 @@ export default function OrdersPage() {
           {([
             { key: "recall" as const, label: "À rappeler",                value: stats.toRecall,                          growth: null as number | null,         points: false, icon: <Bell size={15}/>,        clickable: true,  alert: true  },
             { key: "all"    as const, label: "Total commandes",           value: stats.total,                             growth: stats.totalGrowth,             points: false, icon: <ShoppingCart size={15}/>, clickable: true,  alert: false },
-            { key: null,              label: "Revenu total",              value: `${stats.revenue.toLocaleString()} ${currency}`, growth: stats.revenueGrowth,   points: false, icon: <DollarSign size={15}/>,  clickable: false, alert: false },
+            { key: null,              label: "Revenu confirmé",           value: `${stats.revenue.toLocaleString()} ${currency}`, growth: stats.revenueGrowth,   points: false, icon: <DollarSign size={15}/>,  clickable: false, alert: false },
             { key: null,              label: "Taux de confirmation",      value: `${stats.confirmationRate}%`,            growth: stats.confirmationRateGrowth,  points: true,  icon: <CheckCircle2 size={15}/>, clickable: false, alert: false },
             { key: null,              label: "Temps moyen de traitement", value: fmtMinutes(stats.avgProcessingTimeMin),  growth: stats.avgProcessingGrowth,     points: false, icon: <Clock3 size={15}/>,      clickable: false, alert: false },
           ]).map((c, idx) => {
@@ -754,17 +818,18 @@ export default function OrdersPage() {
             />
           </div>
 
-          {/* Status filter */}
+          {/* Filtre Statut (+ « Sans statut » = commandes non traitées) */}
           <select
             value={filterStatus}
             onChange={e => handleFilter("status", e.target.value)}
             style={{ height: 34, border: "1px solid #e5e7eb", borderRadius: 9, fontSize: 11, padding: "0 10px", outline: "none", background: "white", cursor: "pointer" }}
           >
             <option value="">Tous les statuts</option>
+            <option value="none">Sans statut</option>
             {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
 
-          {/* Product filter */}
+          {/* Filtre Produit */}
           <select
             value={filterProduct}
             onChange={e => handleFilter("product", e.target.value)}
@@ -773,6 +838,19 @@ export default function OrdersPage() {
             <option value="">Tous les produits</option>
             {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+
+          {/* Filtre Agent (+ « Sans agent » = commandes non attribuées, admin) — masqué pour les agents */}
+          {!isAgent && (
+            <select
+              value={filterAgent}
+              onChange={e => handleFilter("agent", e.target.value)}
+              style={{ height: 34, border: "1px solid #e5e7eb", borderRadius: 9, fontSize: 11, padding: "0 10px", outline: "none", background: "white", cursor: "pointer" }}
+            >
+              <option value="">Tous les agents</option>
+              <option value="none">Sans agent</option>
+              {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          )}
 
           {/* Column settings */}
           <div style={{ position: "relative" }}>
@@ -784,7 +862,7 @@ export default function OrdersPage() {
                 padding: "0 12px", borderRadius: 9, fontSize: 11, fontWeight: 600, cursor: "pointer",
               }}
             >
-              <SlidersHorizontal size={13} /> Columns
+              <SlidersHorizontal size={13} /> Colonnes
             </button>
             {showColMenu && (
               <div style={{
@@ -793,7 +871,7 @@ export default function OrdersPage() {
                 padding: "10px 12px", boxShadow: "0 8px 24px rgba(0,0,0,0.08)", width: 160,
               }}>
                 <p style={{ fontSize: "10px", color: "#9ca3af", marginBottom: 8, fontWeight: 700, textTransform: "uppercase" }}>
-                  Show / Hide
+                  Afficher / Masquer
                 </p>
                 {COLS.filter(c => c.hideable).map(col => (
                   <label key={col.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 11, cursor: "pointer" }}>
@@ -842,10 +920,10 @@ export default function OrdersPage() {
             </button>
           )}
 
-          {/* Refresh */}
+          {/* Actualiser */}
           <button
             onClick={refresh}
-            title="Refresh"
+            title="Actualiser"
             style={{
               height: 34, width: 34, display: "flex", alignItems: "center", justifyContent: "center",
               border: "1px solid #e5e7eb", background: "white", borderRadius: 9, cursor: "pointer",
@@ -1053,23 +1131,23 @@ export default function OrdersPage() {
             }}>
               <Trash2 size={20} color="#ef4444" />
             </div>
-            <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Delete Orders?</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Supprimer les commandes ?</h3>
             <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 20 }}>
-              You are about to permanently delete <strong>{selected.size}</strong> order{selected.size > 1 ? "s" : ""}.
-              This cannot be undone.
+              Vous allez supprimer définitivement <strong>{selected.size}</strong> commande{selected.size > 1 ? "s" : ""}.
+              Cette action est irréversible.
             </p>
             <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
               <button
                 onClick={() => setConfirmDel(false)}
                 style={{ border: "1px solid #e5e7eb", background: "white", padding: "9px 20px", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
               >
-                Cancel
+                Annuler
               </button>
               <button
                 onClick={handleDelete}
                 style={{ border: "none", background: "#ef4444", color: "white", padding: "9px 20px", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
               >
-                Delete
+                Supprimer
               </button>
             </div>
           </div>

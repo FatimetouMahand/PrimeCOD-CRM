@@ -47,34 +47,74 @@ export async function PATCH(
       notes?: string | null;
       attempts?: number;
       recallAt?: Date | null;
+      assignedAt?: Date | null;
       firstProcessedAt?: Date;
       processingTimeMin?: number;
       absoluteDelayMin?: number;
     } = {};
 
-    // ── Status change: Admin or Supervisor only ──────────────────────────────
+    // ── Changement de statut : Admin, Superviseur OU l'agent assigné ──────────
+    //   (l'agent traite ses propres commandes : c'est lui qui pose le statut)
     if ("statusId" in body) {
-      if (caller.role !== "ADMIN" && caller.role !== "SUPERVISOR") {
+      const isAssignedAgent = order.agentId === caller.id;
+      if (caller.role !== "ADMIN" && caller.role !== "SUPERVISOR" && !isAssignedAgent) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      data.statusId = body.statusId || null;
+      const newStatusId: string | null = body.statusId || null;
+      data.statusId = newStatusId;
 
-      // First status change → record processing time (temps de traitement)
-      if (!order.firstProcessedAt) {
-        const now = new Date();
-        const settings = await getSystemSettings();
-        data.firstProcessedAt   = now;
-        data.processingTimeMin  = calculateWorkMinutes(order.createdAt, now, settings);
-        data.absoluteDelayMin   = Math.round((now.getTime() - order.createdAt.getTime()) / 60000);
+      const now = new Date();
+      const settings = await getSystemSettings();
+
+      // Première mise à jour de statut → enregistrer le temps de traitement.
+      // Base = date d'attribution à l'agent (sinon création de la commande).
+      if (newStatusId && !order.firstProcessedAt) {
+        const base = order.assignedAt ?? order.createdAt;
+        data.firstProcessedAt  = now;
+        data.processingTimeMin = calculateWorkMinutes(base, now, settings);
+        data.absoluteDelayMin  = Math.round((now.getTime() - base.getTime()) / 60000);
+      }
+
+      // Rappel automatique — sauf si un rappel manuel est fourni dans la requête.
+      if (!("recallAt" in body)) {
+        if (newStatusId) {
+          const status = await prisma.status.findUnique({
+            where: { id: newStatusId },
+            select: { alertAfterHours: true },
+          });
+          if (status?.alertAfterHours != null) {
+            // Statut « à rappeler » (ex. Ne répond pas) : planifier le rappel
+            // dans X heures et incrémenter le compteur de tentatives, jusqu'au max.
+            const maxAttempts = settings.maxRecallAttempts ?? 3;
+            const current = order.attempts ?? 0;
+            if (current < maxAttempts) {
+              data.attempts = current + 1;
+              if (current + 1 >= maxAttempts) {
+                data.recallAt = null; // plus de rappel après le maximum de tentatives
+              } else {
+                const r = new Date(now);
+                r.setHours(r.getHours() + status.alertAfterHours);
+                data.recallAt = r;
+              }
+            }
+          } else {
+            // Statut sans alerte → effacer tout rappel en attente
+            data.recallAt = null;
+          }
+        } else {
+          // Retour à « non traité » → effacer le rappel
+          data.recallAt = null;
+        }
       }
     }
 
-    // ── Agent reassignment: Admin only ────────────────────────────────────────
+    // ── Réattribution d'agent : Admin ou Superviseur ──────────────────────────
     if ("agentId" in body) {
-      if (caller.role !== "ADMIN") {
+      if (caller.role !== "ADMIN" && caller.role !== "SUPERVISOR") {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      data.agentId = body.agentId || null;
+      data.agentId   = body.agentId || null;
+      data.assignedAt = body.agentId ? new Date() : null;
     }
 
     // ── Notes / Tentatives d'appel / Rappel : Admin, Superviseur ou agent assigné ──
