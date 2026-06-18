@@ -30,6 +30,15 @@ export default function ProductsPage() {
   const [confirmDel, setConfirmDel] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [detailTarget, setDetailTarget] = useState<Product | null>(null); // fenêtre détails (mobile)
+  // Filtres (comme l'ancienne app) : par agent assigné, par agent masqué, par distribution
+  const [filterAssigned, setFilterAssigned] = useState<Set<string>>(new Set());
+  const [filterHidden,   setFilterHidden]   = useState<Set<string>>(new Set());
+  const [filterDistrib,  setFilterDistrib]  = useState<"" | "specific" | "random">("");
+
+  const toggleFilterAssigned = (id: string) =>
+    setFilterAssigned(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const toggleFilterHidden = (id: string) =>
+    setFilterHidden(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   // ── Fetch ─────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -72,10 +81,14 @@ export default function ProductsPage() {
     setConfirmDel(false);
   };
 
-  const displayed = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.code.toLowerCase().includes(search.toLowerCase())
-  );
+  const displayed = products.filter(p => {
+    const q = search.toLowerCase();
+    const matchSearch   = p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
+    const matchAssigned = filterAssigned.size === 0 || p.assignedAgentIds.some(id => filterAssigned.has(id));
+    const matchHidden   = filterHidden.size === 0   || p.hiddenForAgentIds.some(id => filterHidden.has(id));
+    const matchDistrib  = filterDistrib === ""      || p.distributionType === filterDistrib;
+    return matchSearch && matchAssigned && matchHidden && matchDistrib;
+  });
 
   const totalOrders = products.reduce((s, p) => s + p._count.orders, 0);
   const specific    = products.filter(p => p.distributionType === "specific").length;
@@ -143,20 +156,58 @@ export default function ProductsPage() {
 
       {/* FILTERS */}
       <div className="glass-card" style={{ marginBottom: "10px" }}>
-        <div style={{ padding: "10px 14px", display: "flex", gap: "8px", alignItems: "center" }}>
+        <div style={{ padding: "10px 14px", display: "flex", gap: "8px", alignItems: "flex-start", flexWrap: "wrap" }}>
+          {/* Recherche nom / code */}
           <div style={{ position: "relative", flex: 1, minWidth: "180px" }}>
-            <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+            <Search size={13} style={{ position: "absolute", left: 10, top: 17, transform: "translateY(-50%)", color: "#9ca3af" }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher nom ou code…"
               style={{ width: "100%", paddingLeft: 30, paddingRight: 12, height: 34, border: "1px solid #e5e7eb", borderRadius: 9, fontSize: 11, outline: "none", background: "#f9fafb" }} />
           </div>
+
+          {/* Filtre Distribution (équivalent du filtre « Statut » de l'ancienne app) */}
+          <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", height: 34, flexShrink: 0 }}>
+            {[
+              { val: "",         label: "Tous" },
+              { val: "specific", label: "Spécifique" },
+              { val: "random",   label: "Libre" },
+            ].map(opt => (
+              <button key={opt.val} type="button" onClick={() => setFilterDistrib(opt.val as "" | "specific" | "random")}
+                style={{
+                  border: "none", padding: "0 11px", fontSize: 11, fontWeight: 700, cursor: "pointer",
+                  background: filterDistrib === opt.val ? "#0d3938" : "white",
+                  color:      filterDistrib === opt.val ? "white"   : "#374151",
+                }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Filtre par Agent assigné */}
+          <div style={{ width: 175, flexShrink: 0 }}>
+            <AgentMultiSelect agents={agents} selected={filterAssigned} onToggle={toggleFilterAssigned} placeholder="Agent assigné" />
+          </div>
+
+          {/* Filtre par Agent masqué */}
+          <div style={{ width: 175, flexShrink: 0 }}>
+            <AgentMultiSelect agents={agents} selected={filterHidden} onToggle={toggleFilterHidden} placeholder="Masqué pour" tone="red" />
+          </div>
+
+          {/* Réinitialiser les filtres */}
+          {(filterAssigned.size > 0 || filterHidden.size > 0 || filterDistrib !== "" || search) && (
+            <button onClick={() => { setSearch(""); setFilterAssigned(new Set()); setFilterHidden(new Set()); setFilterDistrib(""); }}
+              style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "1px solid #e5e7eb", background: "white", color: "#6b7280", padding: "0 12px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+              <X size={12} /> Réinitialiser
+            </button>
+          )}
+
           {selected.size > 0 && (
             <>
               <button onClick={() => setShowBulkEdit(true)}
-                style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "1px solid #0d3938", background: "#beecdf", color: "#0d3938", padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "1px solid #0d3938", background: "#beecdf", color: "#0d3938", padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
                 <Pencil size={13} /> Modifier ({selected.size})
               </button>
               <button onClick={() => setConfirmDel(true)}
-                style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "none", background: "#ef4444", color: "white", padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", gap: 5, height: 34, border: "none", background: "#ef4444", color: "white", padding: "0 14px", borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
                 <Trash2 size={13} /> Supprimer ({selected.size})
               </button>
             </>
