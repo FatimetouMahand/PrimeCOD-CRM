@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect } from "react";
 import { translate, type Lang } from "@/i18n/translations";
 
 interface LangCtx {
@@ -12,27 +12,18 @@ interface LangCtx {
 const LanguageContext = createContext<LangCtx>({ lang: "fr", dir: "ltr", t: (k) => k });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLang] = useState<Lang>("fr");
+  // App en français uniquement pour l'instant (le choix arabe a été retiré).
+  // L'infrastructure i18n reste en place : t() renvoie le français, et on
+  // pourra réactiver l'arabe plus tard sans tout réécrire.
+  const lang: Lang = "fr";
+  const dir: "ltr" | "rtl" = "ltr";
 
-  // Lit la langue choisie dans Paramètres → Général
-  useEffect(() => {
-    fetch("/api/settings")
-      .then(r => (r.ok ? r.json() : {}))
-      .then((d: Record<string, string>) => {
-        if (d.language === "ar" || d.language === "fr") setLang(d.language);
-      })
-      .catch(() => {});
-  }, []);
-
-  const dir: "ltr" | "rtl" = lang === "ar" ? "rtl" : "ltr";
-
-  // Applique la direction (RTL pour l'arabe) au document
   useEffect(() => {
     if (typeof document !== "undefined") {
-      document.documentElement.lang = lang;
-      document.documentElement.dir = dir;
+      document.documentElement.lang = "fr";
+      document.documentElement.dir = "ltr";
     }
-  }, [lang, dir]);
+  }, []);
 
   const t = (key: string) => translate(key, lang);
 

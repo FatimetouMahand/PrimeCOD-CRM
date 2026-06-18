@@ -77,22 +77,6 @@ function GeneralTab() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <Card title="Langue du système">
-        <div style={{ display: "flex", gap: 10 }}>
-          {[{ v: "fr", label: "Français" }, { v: "ar", label: "العربية" }].map(l => (
-            <button key={l.v} onClick={() => setLanguage(l.v)} style={{
-              flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 700,
-              fontSize: 13, cursor: "pointer",
-              border: language === l.v ? "2px solid #0d3938" : "1.5px solid #e5e7eb",
-              background: language === l.v ? "#eef2ff" : "white",
-              color: language === l.v ? "#4f46e5" : "#374151",
-            }}>
-              {l.label}
-            </button>
-          ))}
-        </div>
-      </Card>
-
       <Card
         title="Seuil de distribution"
         subtitle="Nombre max de commandes non-confirmées par agent avant blocage — 0 = sans limite"
