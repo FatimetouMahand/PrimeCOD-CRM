@@ -302,57 +302,9 @@ export async function GET(request: Request) {
       log.push(`ℹ️ Admin déjà existant : ${adminExists.phone}`);
     }
 
-    // ── STEP 12b: Create test Supervisor account (if not exists) ──────────────
-    const supExists = await prisma.user.findUnique({ where: { phone: "11111111" } });
-    if (!supExists) {
-      const hashed    = await hashPassword("superviseur123");
-      const encrypted = encrypt("superviseur123");
-      await prisma.user.create({
-        data: {
-          name:              "Superviseur Test",
-          phone:             "11111111",
-          password:          hashed,
-          encryptedPassword: encrypted,
-          role:              "SUPERVISOR",
-          status:            "ACTIVE",
-          iconColor:         "#1d4ed8",
-          canViewOrders:    true,  canEditOrders:    false,
-          canViewUsers:     false, canEditUsers:     false,
-          canViewProducts:  true,  canEditProducts:  false,
-          canViewStatuses:  true,  canEditStatuses:  false,
-          canViewReporting: true,  canViewDashboard: true,
-        },
-      });
-      log.push("✅ Compte Superviseur créé (11111111 / superviseur123)");
-    } else {
-      log.push(`ℹ️ Superviseur déjà existant : ${supExists.phone}`);
-    }
-
-    // ── STEP 12c: Create test Agent account (if not exists) ───────────────────
-    const agentExists = await prisma.user.findUnique({ where: { phone: "22222222" } });
-    if (!agentExists) {
-      const hashed    = await hashPassword("agent123");
-      const encrypted = encrypt("agent123");
-      await prisma.user.create({
-        data: {
-          name:              "Sidi",
-          phone:             "22222222",
-          password:          hashed,
-          encryptedPassword: encrypted,
-          role:              "AGENT",
-          status:            "ACTIVE",
-          iconColor:         "#16a34a",
-          canViewOrders:    true,  canEditOrders:    true,
-          canViewUsers:     false, canEditUsers:     false,
-          canViewProducts:  false, canEditProducts:  false,
-          canViewStatuses:  false, canEditStatuses:  false,
-          canViewReporting: false, canViewDashboard: true,
-        },
-      });
-      log.push("✅ Compte Agent créé (22222222 / agent123)");
-    } else {
-      log.push(`ℹ️ Agent déjà existant : ${agentExists.phone}`);
-    }
+    // Note : aucun compte agent/superviseur de démonstration n'est créé ici.
+    // Les agents (et leurs NOMS) sont gérés uniquement dans la base de données,
+    // via la page Employés. L'application lit toujours les noms depuis la base.
 
     // ── STEP 12: Fix User.name if it's NOT NULL but some rows are empty ──────
     await prisma.$executeRawUnsafe(`
